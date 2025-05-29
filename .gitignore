@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Debug files
+*.png
+error-screenshot.png
+debug-screenshot.png
+
+# Build output
+dist/
+
+# Cache files
+.DS_Store
+*.log
+npm-debug.log*
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo 

@@ -1,0 +1,25 @@
+﻿
+
+StatusCode        : 200
+StatusDescription : OK
+Content           : [{"competition":"Munster GAA Hurling Senior Championship","date":"Saturday 03 May","
+                    homeTeam":"Waterford","awayTeam":"Limerick","homeScore":"0-22","awayScore":"0-28","v
+                    enue":"Walsh Park, Waterford","r...
+RawContent        : HTTP/1.1 200 OK
+                    Access-Control-Allow-Origin: *
+                    Connection: keep-alive
+                    Keep-Alive: timeout=5
+                    Content-Length: 28115
+                    Content-Type: application/json; charset=utf-8
+                    Date: Thu, 29 May 2025 14:34:00 GM...
+Forms             : {}
+Headers           : {[Access-Control-Allow-Origin, *], [Connection, keep-alive], [Keep-Alive, 
+                    timeout=5], [Content-Length, 28115]...}
+Images            : {}
+InputFields       : {}
+Links             : {}
+ParsedHtml        : mshtml.HTMLDocumentClass
+RawContentLength  : 28115
+
+
+

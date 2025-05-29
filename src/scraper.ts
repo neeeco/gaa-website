@@ -38,47 +38,46 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
     
     // Wait for initial page load and specific elements
     await page.waitForLoadState('domcontentloaded');
+
+    // Handle cookie consent popup if it appears
+    console.log('Checking for cookie consent popup...');
+    try {
+      const cookieConsentButton = await page.$('#ccc-notify-accept');
+      if (cookieConsentButton) {
+        console.log('Accepting cookies...');
+        await cookieConsentButton.click();
+        await page.waitForTimeout(2000); // Wait for overlay to disappear
+      }
+    } catch (error) {
+      console.log('No cookie consent popup found or error handling it:', error);
+    }
+
     await page.waitForSelector('.gar-matches-list__day', { timeout: 10000 });
     console.log('Found match day sections, waiting for content to stabilize...');
     
     // Add a longer delay to let JavaScript execute and dynamic content load
     await new Promise(resolve => setTimeout(resolve, 8000));
 
-    // Extract match data
-    const matches = await page.evaluate(() => {
-      const allMatches: any[] = [];
-      let matchCount = 0;
-      let fixtureCount = 0;
-      let resultCount = 0;
-      
-      // Find all match day sections
-      const matchDays = document.querySelectorAll('.gar-matches-list__day');
-      console.log(`Found ${matchDays.length} match days`);
-      
-      matchDays.forEach((day, dayIndex) => {
-        // Get the date for this day
-        const date = day.querySelector('.gar-matches-list__date')?.textContent?.trim() || '';
-        
-        // Find all match groups in this day
-        const matchGroups = day.querySelectorAll('.gar-matches-list__group');
-        console.log(`Day ${dayIndex + 1} (${date}): Found ${matchGroups.length} match groups`);
-        
-        matchGroups.forEach((group, groupIndex) => {
-          // Get the competition name
-          const competition = group.querySelector('.gar-matches-list__group-name')?.textContent?.trim() || '';
+    // Click "More results" button until it's no longer visible or clickable
+    console.log('Looking for "More results" button...');
+    let clickCount = 0;
+    let lastMatchCount = 0;
+    let allMatches: any[] = [];
+
+    while (true) {
+      try {
+        // Get current matches
+        const currentMatches = await page.evaluate(() => {
+          const matches: any[] = [];
+          const matchElements = document.querySelectorAll('.gar-match-item');
           
-          // Find all matches in this group
-          const matchItems = group.querySelectorAll('.gar-match-item');
-          console.log(`- Group ${groupIndex + 1} (${competition}): Found ${matchItems.length} matches`);
-          
-          matchItems.forEach(match => {
-            matchCount++;
+          matchElements.forEach(match => {
+            const competition = match.closest('.gar-matches-list__group')?.querySelector('.gar-matches-list__group-name')?.textContent?.trim() || '';
+            const date = match.closest('.gar-matches-list__day')?.querySelector('.gar-matches-list__date')?.textContent?.trim() || '';
             
-            // Get team names
             const homeTeam = match.querySelector('.gar-match-item__team.-home .gar-match-item__team-name')?.textContent?.trim() || '';
             const awayTeam = match.querySelector('.gar-match-item__team.-away .gar-match-item__team-name')?.textContent?.trim() || '';
             
-            // Get scores using the correct selectors for home and away scores
             let homeScore = null;
             let awayScore = null;
             
@@ -86,35 +85,19 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
             const awayScoreElement = match.querySelector('.gar-match-item__score.-away');
             
             if (homeScoreElement && awayScoreElement) {
-              // Clean up the score text by removing HTML comments and extra spaces
               homeScore = homeScoreElement.textContent?.replace(/<!--.*?-->/g, '').trim();
               awayScore = awayScoreElement.textContent?.replace(/<!--.*?-->/g, '').trim();
-              
-              // Log the raw and cleaned scores for debugging
-              console.log(`Raw scores for ${homeTeam} vs ${awayTeam}:`, {
-                homeRaw: homeScoreElement.textContent,
-                awayRaw: awayScoreElement.textContent,
-                homeClean: homeScore,
-                awayClean: awayScore
-              });
             }
             
-            // Get match info
             const time = match.querySelector('.gar-match-item__upcoming')?.textContent?.trim() || 
                         match.querySelector('.gar-match-item__time')?.textContent?.trim() || '';
                         
             const venue = match.querySelector('.gar-match-item__venue')?.textContent?.trim()?.replace('Venue: ', '') || '';
             const referee = match.querySelector('.gar-match-item__referee')?.textContent?.trim()?.replace('Referee: ', '') || '';
             
-            // A match is a fixture if it has no scores
             const isFixture = !homeScore && !awayScore;
-            if (isFixture) fixtureCount++;
-            else resultCount++;
             
-            // Log each match for debugging
-            console.log(`Match ${matchCount}: ${homeTeam} ${homeScore || '-'} vs ${awayScore || '-'} ${awayTeam} (${isFixture ? 'Fixture' : 'Result'})`);
-            
-            allMatches.push({
+            matches.push({
               competition,
               date,
               homeTeam,
@@ -127,15 +110,66 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
               isFixture
             });
           });
+          
+          return matches;
         });
-      });
-      
-      console.log(`Total matches: ${matchCount} (${fixtureCount} fixtures, ${resultCount} results)`);
-      return allMatches;
-    });
 
-    console.log(`Successfully scraped ${matches.length} matches (${matches.filter(m => m.isFixture).length} fixtures, ${matches.filter(m => !m.isFixture).length} results)`);
-    return matches;
+        console.log(`Found ${currentMatches.length} matches on current page`);
+
+        // Add new matches to our collection, avoiding duplicates
+        const newMatches = currentMatches.filter(newMatch => 
+          !allMatches.some(existingMatch => 
+            existingMatch.homeTeam === newMatch.homeTeam && 
+            existingMatch.awayTeam === newMatch.awayTeam && 
+            existingMatch.date === newMatch.date
+          )
+        );
+        
+        allMatches = [...allMatches, ...newMatches];
+        console.log(`Total unique matches collected: ${allMatches.length}`);
+
+        if (currentMatches.length === lastMatchCount) {
+          console.log('No new matches loaded after last click, stopping');
+          break;
+        }
+        lastMatchCount = currentMatches.length;
+
+        // Look for More results button
+        const buttonExists = await page.evaluate(() => {
+          const button = document.querySelector('.gar-matches-list__btn.btn-secondary.-next');
+          return button !== null && (button as HTMLElement).offsetParent !== null;
+        });
+
+        if (!buttonExists) {
+          console.log('No more "More results" button found - all matches loaded');
+          break;
+        }
+
+        clickCount++;
+        console.log(`Clicking "More results" button (attempt ${clickCount})...`);
+
+        // Click the button using JavaScript
+        await page.evaluate(() => {
+          const button = document.querySelector('.gar-matches-list__btn.btn-secondary.-next');
+          if (button instanceof HTMLElement) {
+            button.click();
+          }
+        });
+
+        // Wait for new content to load
+        await page.waitForTimeout(5000);
+        
+      } catch (error) {
+        console.log('Error clicking More results button:', error);
+        await page.screenshot({ path: 'click-error.png', fullPage: true });
+        break;
+      }
+    }
+
+    console.log(`Total clicks: ${clickCount}`);
+    console.log(`Final match count: ${allMatches.length}`);
+
+    return allMatches;
     
   } catch (error) {
     console.error('Error scraping GAA fixtures and results:', error);

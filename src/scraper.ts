@@ -34,44 +34,64 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
   
   try {
     console.log('Navigating to GAA website...');
-    await page.goto('https://www.gaa.ie/fixtures-results');
+    await page.goto('https://www.gaa.ie/fixtures-results', { waitUntil: 'domcontentloaded' });
     
-    // Wait for initial page load and specific elements
-    await page.waitForLoadState('domcontentloaded');
-
     // Handle cookie consent popup if it appears
     console.log('Checking for cookie consent popup...');
     try {
-      const cookieConsentButton = await page.$('#ccc-notify-accept');
-      if (cookieConsentButton) {
-        console.log('Accepting cookies...');
-        await cookieConsentButton.click();
-        await page.waitForTimeout(2000); // Wait for overlay to disappear
-      }
+      // Wait for and click the accept button
+      await page.waitForSelector('#ccc-notify-accept', { timeout: 3000 });
+      await page.click('#ccc-notify-accept');
+      
+      // Wait for overlay to be gone
+      await page.waitForSelector('#ccc-overlay', { state: 'hidden', timeout: 5000 });
+      
+      // Additional wait to ensure overlay is fully gone
+      await page.waitForTimeout(1000);
+      
+      // Force remove any remaining overlay
+      await page.evaluate(() => {
+        const overlay = document.querySelector('#ccc-overlay');
+        if (overlay) {
+          overlay.remove();
+        }
+        const module = document.querySelector('#ccc');
+        if (module) {
+          module.remove();
+        }
+      });
     } catch (error) {
-      console.log('No cookie consent popup found or error handling it:', error);
+      console.log('No cookie consent popup found or already handled');
+      // Force remove any overlay just in case
+      await page.evaluate(() => {
+        const overlay = document.querySelector('#ccc-overlay');
+        if (overlay) {
+          overlay.remove();
+        }
+        const module = document.querySelector('#ccc');
+        if (module) {
+          module.remove();
+        }
+      });
     }
 
-    await page.waitForSelector('.gar-matches-list__day', { timeout: 10000 });
-    console.log('Found match day sections, waiting for content to stabilize...');
+    // Wait for initial content
+    await page.waitForSelector('.gar-matches-list__day', { timeout: 5000 });
+    console.log('Found match day sections');
     
-    // Add a longer delay to let JavaScript execute and dynamic content load
-    await new Promise(resolve => setTimeout(resolve, 8000));
+    // Wait a short time for dynamic content
+    await page.waitForTimeout(2000);
 
-    // Click "More results" button until it's no longer visible or clickable
-    console.log('Looking for "More results" button...');
+    let allMatches: any[] = [];
     let clickCount = 0;
     let lastMatchCount = 0;
-    let allMatches: any[] = [];
 
     while (true) {
       try {
         // Get current matches
         const currentMatches = await page.evaluate(() => {
           const matches: any[] = [];
-          const matchElements = document.querySelectorAll('.gar-match-item');
-          
-          matchElements.forEach(match => {
+          document.querySelectorAll('.gar-match-item').forEach(match => {
             const competition = match.closest('.gar-matches-list__group')?.querySelector('.gar-matches-list__group-name')?.textContent?.trim() || '';
             const date = match.closest('.gar-matches-list__day')?.querySelector('.gar-matches-list__date')?.textContent?.trim() || '';
             
@@ -148,41 +168,34 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
         clickCount++;
         console.log(`Clicking "More results" button (attempt ${clickCount})...`);
 
-        // Click the button using JavaScript
-        await page.evaluate(() => {
-          const button = document.querySelector('.gar-matches-list__btn.btn-secondary.-next');
-          if (button instanceof HTMLElement) {
-            button.click();
-          }
-        });
+        // Click using JavaScript and wait for network idle
+        await Promise.all([
+          page.evaluate(() => {
+            const button = document.querySelector('.gar-matches-list__btn.btn-secondary.-next');
+            if (button instanceof HTMLElement) {
+              button.click();
+            }
+          }),
+          page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
+        ]);
 
-        // Wait for new content to load
-        await page.waitForTimeout(5000);
+        // Wait for new content
+        await page.waitForTimeout(2000);
         
       } catch (error) {
         console.log('Error clicking More results button:', error);
-        await page.screenshot({ path: 'click-error.png', fullPage: true });
         break;
       }
     }
 
     console.log(`Total clicks: ${clickCount}`);
     console.log(`Final match count: ${allMatches.length}`);
-
     return allMatches;
     
   } catch (error) {
     console.error('Error scraping GAA fixtures and results:', error);
-    try {
-      await page.screenshot({ path: 'error-screenshot.png', fullPage: true });
-      console.log('Error screenshot saved as error-screenshot.png');
-    } catch (screenshotError) {
-      console.error('Failed to save error screenshot:', screenshotError);
-    }
     throw error;
   } finally {
-    // Keep the browser open longer for inspection
-    await new Promise(resolve => setTimeout(resolve, 15000));
     console.log('Closing browser...');
     await browser.close();
   }

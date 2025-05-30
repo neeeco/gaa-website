@@ -19,7 +19,7 @@ export default function MatchCard({ match }: MatchCardProps) {
 
   return (
     <div className="bg-white rounded-lg shadow-md p-4 mb-4 hover:shadow-lg transition-shadow">
-      <div className="text-sm text-gray-600 mb-2">
+      <div className="te  t-sm text-gray-600 mb-2">
         {competition} - {round}
       </div>
       

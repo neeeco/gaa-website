@@ -70,7 +70,7 @@ app.get('/api/matches', async (req: Request, res: Response) => {
       error: 'Failed to fetch matches',
       details: error instanceof Error ? error.message : 'Unknown error'
     });
-  }
+  } 
 });
 
 // Handle 404 errors

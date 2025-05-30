@@ -12,7 +12,7 @@ app.use(cors());
 
 // Cache configuration
 const CACHE_FILE = path.join(__dirname, '../data/matches.json');
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
+const CACHE_DURATION = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
 
 interface CacheData {
     matches: any[];

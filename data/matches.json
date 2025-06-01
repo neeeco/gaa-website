@@ -2285,24 +2285,24 @@
       "date": "Sunday 01 June",
       "homeTeam": "Dublin",
       "awayTeam": "Armagh",
-      "homeScore": null,
-      "awayScore": null,
+      "homeScore": "0-19",
+      "awayScore": "0-24",
       "venue": "Páirc an Chrócaigh",
       "referee": "Joe Mc Quillan",
-      "time": "16:00",
-      "isFixture": true
+      "time": "",
+      "isFixture": false
     },
     {
       "competition": "GAA Football All-Ireland Senior Championship",
       "date": "Sunday 01 June",
       "homeTeam": "Monaghan",
       "awayTeam": "Clare",
-      "homeScore": null,
-      "awayScore": null,
+      "homeScore": "1-25",
+      "awayScore": "1-16",
       "venue": "St. Tiernach's Park, Clones",
       "referee": "Jerome Henry",
-      "time": "16:00",
-      "isFixture": true
+      "time": "",
+      "isFixture": false
     },
     {
       "competition": "2025 Electric Ireland GAA Hurling All-Ireland Minor Championship",
@@ -2941,5 +2941,5 @@
       "isFixture": true
     }
   ],
-  "lastFetch": 1748793471977
+  "lastFetch": 1748801094946
 }

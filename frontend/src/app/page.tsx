@@ -22,6 +22,74 @@ function filterSeniorChampionships(matches: Match[]) {
   });
 }
 
+// Helper function to parse date strings for sorting
+function parseMatchDate(match: Match): Date {
+  const { date, time } = match;
+  
+  try {
+    // Convert date like "Sunday 01 June" to a proper date
+    // Extract day and month
+    const dateMatch = date.match(/(\d{1,2})\s+(\w+)/);
+    if (!dateMatch) return new Date(); // fallback to current date
+    
+    const day = parseInt(dateMatch[1]);
+    const monthStr = dateMatch[2].toLowerCase();
+    
+    // Map month names to numbers (assuming current year)
+    const monthMap: Record<string, number> = {
+      'january': 0, 'jan': 0,
+      'february': 1, 'feb': 1,
+      'march': 2, 'mar': 2,
+      'april': 3, 'apr': 3,
+      'may': 4,
+      'june': 5, 'jun': 5,
+      'july': 6, 'jul': 6,
+      'august': 7, 'aug': 7,
+      'september': 8, 'sep': 8,
+      'october': 9, 'oct': 9,
+      'november': 10, 'nov': 10,
+      'december': 11, 'dec': 11
+    };
+    
+    const month = monthMap[monthStr] ?? 5; // default to June if not found
+    const year = 2025; // assuming current year
+    
+    // Parse time if available
+    let hour = 12; // default to noon
+    let minute = 0;
+    
+    if (time) {
+      const timeMatch = time.match(/(\d{1,2}):(\d{2})/);
+      if (timeMatch) {
+        hour = parseInt(timeMatch[1]);
+        minute = parseInt(timeMatch[2]);
+      }
+    }
+    
+    return new Date(year, month, day, hour, minute);
+  } catch (error) {
+    return new Date(); // fallback to current date
+  }
+}
+
+// Sort results from newest to oldest (most recent first)
+function sortResultsByNewest(results: Match[]): Match[] {
+  return [...results].sort((a, b) => {
+    const dateA = parseMatchDate(a);
+    const dateB = parseMatchDate(b);
+    return dateB.getTime() - dateA.getTime(); // newest first
+  });
+}
+
+// Sort fixtures from nearest to furthest (soonest first)
+function sortFixturesByNearest(fixtures: Match[]): Match[] {
+  return [...fixtures].sort((a, b) => {
+    const dateA = parseMatchDate(a);
+    const dateB = parseMatchDate(b);
+    return dateA.getTime() - dateB.getTime(); // nearest first
+  });
+}
+
 function groupSeniorChampionships(matches: Match[]) {
   const groups = {
     hurling: {} as Record<string, Match[]>,
@@ -47,6 +115,45 @@ function groupSeniorChampionships(matches: Match[]) {
     groups[sport][competition].push(match);
   });
 
+  // Sort matches within each competition group
+  Object.keys(groups.hurling).forEach(competition => {
+    const matches = groups.hurling[competition];
+    const hasResults = matches.some(m => !m.isFixture);
+    const hasFixtures = matches.some(m => m.isFixture);
+    
+    if (hasResults && hasFixtures) {
+      // Mixed group - separate and sort each type
+      const results = sortResultsByNewest(matches.filter(m => !m.isFixture));
+      const fixtures = sortFixturesByNearest(matches.filter(m => m.isFixture));
+      groups.hurling[competition] = [...results, ...fixtures];
+    } else if (hasResults) {
+      // Results only - sort by newest first
+      groups.hurling[competition] = sortResultsByNewest(matches);
+    } else {
+      // Fixtures only - sort by nearest first
+      groups.hurling[competition] = sortFixturesByNearest(matches);
+    }
+  });
+
+  Object.keys(groups.football).forEach(competition => {
+    const matches = groups.football[competition];
+    const hasResults = matches.some(m => !m.isFixture);
+    const hasFixtures = matches.some(m => m.isFixture);
+    
+    if (hasResults && hasFixtures) {
+      // Mixed group - separate and sort each type
+      const results = sortResultsByNewest(matches.filter(m => !m.isFixture));
+      const fixtures = sortFixturesByNearest(matches.filter(m => m.isFixture));
+      groups.football[competition] = [...results, ...fixtures];
+    } else if (hasResults) {
+      // Results only - sort by newest first
+      groups.football[competition] = sortResultsByNewest(matches);
+    } else {
+      // Fixtures only - sort by nearest first
+      groups.football[competition] = sortFixturesByNearest(matches);
+    }
+  });
+
   return groups;
 }
 
@@ -59,10 +166,35 @@ function ChampionshipSection({
   matches: Record<string, Match[]>; 
   isFixtures?: boolean;
 }) {
+  // Helper function to get relative time description
+  const getTimeDescription = (match: Match): string => {
+    const matchDate = parseMatchDate(match);
+    const now = new Date();
+    const diffMs = matchDate.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (isFixtures) {
+      if (diffDays === 0) return "Today";
+      if (diffDays === 1) return "Tomorrow";
+      if (diffDays > 1) return `In ${diffDays} days`;
+      if (diffDays === -1) return "Yesterday";
+      return `${Math.abs(diffDays)} days ago`;
+    } else {
+      if (diffDays === 0) return "Today";
+      if (diffDays === -1) return "Yesterday";
+      if (diffDays > -7) return `${Math.abs(diffDays)} days ago`;
+      if (diffDays > -30) return `${Math.ceil(Math.abs(diffDays) / 7)} weeks ago`;
+      return `${Math.ceil(Math.abs(diffDays) / 30)} months ago`;
+    }
+  };
+
   return (
     <div className="mb-8">
       <h3 className="text-xl font-bold mb-4 text-center bg-gradient-to-r from-green-600 to-orange-500 bg-clip-text text-transparent">
         {title} {isFixtures ? 'Fixtures' : 'Results'}
+        <span className="text-sm font-normal text-gray-500 block">
+          {isFixtures ? '(Nearest to Furthest)' : '(Most Recent to Oldest)'}
+        </span>
       </h3>
       
       {Object.keys(matches).length === 0 ? (
@@ -95,6 +227,14 @@ function ChampionshipSection({
                         )}
                         {match.awayTeam}
                       </div>
+                    </div>
+                    {/* Time indicator */}
+                    <div className={`text-xs px-2 py-1 rounded-full font-medium ${
+                      isFixtures 
+                        ? 'bg-blue-100 text-blue-700' 
+                        : 'bg-green-100 text-green-700'
+                    }`}>
+                      {getTimeDescription(match)}
                     </div>
                   </div>
                   
@@ -164,11 +304,17 @@ export default function HomePage() {
   const seniorMatches = filterSeniorChampionships(matches);
   console.log('Senior matches found:', seniorMatches.length);
   console.log('Sample senior matches:', seniorMatches.slice(0, 3));
-  const fixtures = seniorMatches.filter((m) => m.isFixture);
-  const results = seniorMatches.filter((m) => !m.isFixture);
+  
+  // Separate fixtures and results
+  const allFixtures = seniorMatches.filter((m) => m.isFixture);
+  const allResults = seniorMatches.filter((m) => !m.isFixture);
+  
+  // Sort fixtures (nearest first) and results (newest first)
+  const sortedFixtures = sortFixturesByNearest(allFixtures);
+  const sortedResults = sortResultsByNewest(allResults);
 
-  const groupedFixtures = groupSeniorChampionships(fixtures);
-  const groupedResults = groupSeniorChampionships(results);
+  const groupedFixtures = groupSeniorChampionships(sortedFixtures);
+  const groupedResults = groupSeniorChampionships(sortedResults);
 
   return (
     <main className="min-h-screen bg-gray-50">

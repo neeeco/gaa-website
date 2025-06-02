@@ -1,14 +1,18 @@
 export interface Match {
+  id?: number;
   competition: string;
-  date: string;
   homeTeam: string;
   awayTeam: string;
-  homeScore: string;
-  awayScore: string;
+  homeScore?: string;
+  awayScore?: string;
   venue?: string;
   referee?: string;
+  date: string;
   time?: string;
+  broadcasting?: string;
   isFixture: boolean;
+  scrapedAt?: string;
+  createdAt?: string;
 }
 
 export interface GroupTeam {

@@ -10,10 +10,9 @@
   "scripts": {
     "start": "node dist/server.js",
     "dev": "ts-node src/server.ts",
-    "build": "tsc",
+    "build": "npx tsc",
     "test": "jest",
-    "backup": "ts-node src/backup-data.ts",
-    "postinstall": "npm run build"
+    "backup": "ts-node src/backup-data.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",

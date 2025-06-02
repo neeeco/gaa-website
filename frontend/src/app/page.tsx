@@ -583,7 +583,14 @@ function MatchRow({ match }: { match: Match }) {
                 className="w-6 h-6 mr-3 flex-shrink-0 rounded"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
-                  target.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Gaa_crest.svg/100px-Gaa_crest.svg.png';
+                  if (!target.dataset.fallbackAttempted) {
+                    target.dataset.fallbackAttempted = 'true';
+                    target.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Gaa_crest.svg/100px-Gaa_crest.svg.png';
+                  } else {
+                    // Final fallback: transparent 1x1 pixel to stop infinite loops
+                    target.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+                    target.style.display = 'none';
+                  }
                 }}
               />
               <span className="font-medium text-gray-900 truncate">{match.homeTeam}</span>
@@ -611,7 +618,14 @@ function MatchRow({ match }: { match: Match }) {
                 className="w-6 h-6 mr-3 flex-shrink-0 rounded"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
-                  target.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Gaa_crest.svg/100px-Gaa_crest.svg.png';
+                  if (!target.dataset.fallbackAttempted) {
+                    target.dataset.fallbackAttempted = 'true';
+                    target.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Gaa_crest.svg/100px-Gaa_crest.svg.png';
+                  } else {
+                    // Final fallback: transparent 1x1 pixel to stop infinite loops
+                    target.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+                    target.style.display = 'none';
+                  }
                 }}
               />
               <span className="font-medium text-gray-900 truncate">{match.awayTeam}</span>
@@ -792,7 +806,14 @@ function GroupTable({ group }: { group: Group }) {
                         className="w-5 h-5 mr-2 flex-shrink-0 rounded"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
-                          target.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Gaa_crest.svg/100px-Gaa_crest.svg.png';
+                          if (!target.dataset.fallbackAttempted) {
+                            target.dataset.fallbackAttempted = 'true';
+                            target.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Gaa_crest.svg/100px-Gaa_crest.svg.png';
+                          } else {
+                            // Final fallback: transparent 1x1 pixel to stop infinite loops
+                            target.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+                            target.style.display = 'none';
+                          }
                         }}
                       />
                       <span className="font-medium text-gray-900">{team.name}</span>

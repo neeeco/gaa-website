@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Match, GroupTeam, Group } from '../types/matches';
+import { getMatches } from '@/services/matches';
 
 // Real All-Ireland SFC Group data based on 2025 structure
 const allIrelandSFCGroups: Group[] = [
@@ -610,25 +611,10 @@ export default function HomePage() {
   const [activeSport, setActiveSport] = useState<'football' | 'hurling'>('football');
 
   useEffect(() => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-    console.log('Fetching from:', `${apiUrl}/api/matches`);
-    
-    fetch(`${apiUrl}/api/matches`)
-      .then((res) => {
-        console.log('Response status:', res.status);
-        if (!res.ok) {
-          throw new Error(`HTTP error! status: ${res.status}`);
-        }
-        return res.json();
-      })
+    getMatches()
       .then((data) => {
-        console.log('Raw data received:', data);
-        console.log('Number of matches:', data.length);
+        console.log('Matches received:', data.length);
         console.log('Sample match:', data[0]);
-        
-        if (!Array.isArray(data)) {
-          throw new Error('Expected array of matches but got: ' + typeof data);
-        }
         
         setMatches(data);
         setLoading(false);

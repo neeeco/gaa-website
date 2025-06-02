@@ -2321,12 +2321,12 @@
       "date": "Sunday 01 June",
       "homeTeam": "Clare",
       "awayTeam": "Galway",
-      "homeScore": null,
-      "awayScore": null,
+      "homeScore": "2-21",
+      "awayScore": "2-13",
       "venue": "FBD Semple Stadium, Thurles",
       "referee": "Nicholas Barry",
-      "time": "15:00",
-      "isFixture": true
+      "time": "",
+      "isFixture": false
     },
     {
       "competition": "Tailteann Cup",
@@ -2440,7 +2440,7 @@
       "competition": "Tailteann Cup",
       "date": "Saturday 07 June",
       "homeTeam": "Westmeath",
-      "awayTeam": "3rd Placed Team / New York",
+      "awayTeam": "Laois",
       "homeScore": null,
       "awayScore": null,
       "venue": "",
@@ -2451,8 +2451,8 @@
     {
       "competition": "Tailteann Cup",
       "date": "Saturday 07 June",
-      "homeTeam": "2nd Placed Team",
-      "awayTeam": "3rd Placed Team / New York",
+      "homeTeam": "Wexford",
+      "awayTeam": "Antrim",
       "homeScore": null,
       "awayScore": null,
       "venue": "",
@@ -2464,7 +2464,7 @@
       "competition": "Tailteann Cup",
       "date": "Saturday 07 June",
       "homeTeam": "Offaly",
-      "awayTeam": "3rd Placed Team / New York",
+      "awayTeam": "New York",
       "homeScore": null,
       "awayScore": null,
       "venue": "",
@@ -2475,8 +2475,8 @@
     {
       "competition": "Tailteann Cup",
       "date": "Saturday 07 June",
-      "homeTeam": "2nd Placed Team",
-      "awayTeam": "3rd Placed Team / New York",
+      "homeTeam": "Sligo",
+      "awayTeam": "Carlow",
       "homeScore": null,
       "awayScore": null,
       "venue": "",
@@ -2655,7 +2655,7 @@
     {
       "competition": "Tailteann Cup",
       "date": "Saturday 14 June",
-      "homeTeam": "Group Winner",
+      "homeTeam": "Kildare",
       "awayTeam": "Preliminary Quarter-Final Winner",
       "homeScore": null,
       "awayScore": null,
@@ -2691,7 +2691,7 @@
     {
       "competition": "Tailteann Cup",
       "date": "Saturday 14 June",
-      "homeTeam": "Group Winner",
+      "homeTeam": "Fermanagh",
       "awayTeam": "Preliminary Quarter-Final Winner",
       "homeScore": null,
       "awayScore": null,
@@ -2941,5 +2941,5 @@
       "isFixture": true
     }
   ],
-  "lastFetch": 1748801094946
+  "lastFetch": 1748823232473
 }

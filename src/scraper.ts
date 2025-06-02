@@ -11,80 +11,200 @@ interface Match {
   date: string;
   time?: string;
   isFixture: boolean;
+  scrapedAt?: string;
+  broadcasting?: string;
 }
 
+// Rate limiting variables
+let lastScrapeTime = 0;
+const MIN_SCRAPE_INTERVAL = 5 * 60 * 1000; // 5 minutes minimum between scrapes
+
+// User agents pool for rotation
+const USER_AGENTS = [
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15'
+];
+
+// Random delay helper
+const randomDelay = (min: number = 1000, max: number = 3000) => {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+};
+
+// Get cache duration based on time of day
+const getCacheDuration = () => {
+  const hour = new Date().getHours();
+  // Cache longer during night hours (Irish time) when less likely to be monitored
+  return hour >= 23 || hour <= 6 ? 30 * 60 * 1000 : 5 * 60 * 1000;
+};
+
 export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
-  console.log('Starting browser...');
+  // Rate limiting check
+  const now = Date.now();
+  if (now - lastScrapeTime < MIN_SCRAPE_INTERVAL) {
+    throw new Error(`Rate limited - please wait ${Math.ceil((MIN_SCRAPE_INTERVAL - (now - lastScrapeTime)) / 1000)} seconds before next scrape`);
+  }
+  lastScrapeTime = now;
+
+  console.log('Starting browser with enhanced stealth configuration...');
+  
+  // Randomly select user agent
+  const userAgent = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+  console.log(`Using user agent: ${userAgent.substring(0, 50)}...`);
+
   const browser = await chromium.launch({
-    headless: false
+    headless: process.env.NODE_ENV === 'production' ? true : false,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-accelerated-2d-canvas',
+      '--no-first-run',
+      '--no-zygote',
+      '--disable-gpu',
+      '--disable-web-security',
+      '--disable-features=VizDisplayCompositor',
+      '--disable-extensions',
+      '--disable-plugins',
+      '--disable-images', // Faster loading
+      '--disable-javascript-harmony-shipping',
+      '--disable-background-timer-throttling',
+      '--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding'
+    ]
   });
   
   const context = await browser.newContext({
-    viewport: { width: 1920, height: 1080 },
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    viewport: { width: 1366, height: 768 }, // Common resolution
+    userAgent,
+    locale: 'en-IE', // Irish locale for GAA site
+    timezoneId: 'Europe/Dublin',
     deviceScaleFactor: 1,
+    hasTouch: false,
+    isMobile: false,
+    // Enhanced HTTP headers to appear more like a real browser
+    extraHTTPHeaders: {
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+      'Accept-Language': 'en-IE,en;q=0.9,en-US;q=0.8',
+      'Accept-Encoding': 'gzip, deflate, br',
+      'DNT': '1',
+      'Connection': 'keep-alive',
+      'Upgrade-Insecure-Requests': '1',
+      'Sec-Fetch-Dest': 'document',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-Site': 'none',
+      'Sec-Fetch-User': '?1',
+      'Cache-Control': 'max-age=0'
+    }
   });
 
-  // Add stealth scripts
+  // Enhanced stealth scripts
   await context.addInitScript(() => {
+    // Remove webdriver property
     Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+    
+    // Mock plugins
+    Object.defineProperty(navigator, 'plugins', {
+      get: () => [
+        { name: 'Chrome PDF Plugin', length: 1 },
+        { name: 'Chrome PDF Viewer', length: 1 },
+        { name: 'Native Client', length: 1 }
+      ],
+    });
+    
+    // Mock languages
+    Object.defineProperty(navigator, 'languages', { 
+      get: () => ['en-IE', 'en', 'en-US'] 
+    });
+    
+    // Mock permissions
+    if (window.navigator.permissions) {
+      const originalQuery = window.navigator.permissions.query;
+      window.navigator.permissions.query = (parameters: any) => (
+        parameters.name === 'notifications' ?
+          Promise.resolve({ state: Notification.permission, name: 'notifications', onchange: null } as PermissionStatus) :
+          originalQuery(parameters)
+      );
+    }
+    
+    // Mock webgl
+    if (typeof WebGLRenderingContext !== 'undefined') {
+      const getParameter = WebGLRenderingContext.prototype.getParameter;
+      WebGLRenderingContext.prototype.getParameter = function(parameter: any) {
+        if (parameter === 37445) {
+          return 'Intel Inc.';
+        }
+        if (parameter === 37446) {
+          return 'Intel Iris OpenGL Engine';
+        }
+        return getParameter.call(this, parameter);
+      };
+    }
   });
 
   const page = await context.newPage();
   
+  // Block unnecessary resources to speed up loading and reduce detection
+  await page.route('**/*', (route) => {
+    const resourceType = route.request().resourceType();
+    if (['image', 'font', 'media'].includes(resourceType)) {
+      route.abort();
+    } else {
+      route.continue();
+    }
+  });
+  
   try {
     console.log('Navigating to GAA website...');
-    await page.goto('https://www.gaa.ie/fixtures-results', { waitUntil: 'domcontentloaded' });
+    
+    // Add random delay before navigation
+    await page.waitForTimeout(randomDelay(2000, 5000));
+    
+    await page.goto('https://www.gaa.ie/fixtures-results', { 
+      waitUntil: 'domcontentloaded',
+      timeout: 30000
+    });
     
     // Handle cookie consent popup if it appears
     console.log('Checking for cookie consent popup...');
     try {
-      // Wait for and click the accept button
       await page.waitForSelector('#ccc-notify-accept', { timeout: 3000 });
+      await page.waitForTimeout(randomDelay(500, 1500)); // Human-like delay
       await page.click('#ccc-notify-accept');
       
-      // Wait for overlay to be gone
       await page.waitForSelector('#ccc-overlay', { state: 'hidden', timeout: 5000 });
-      
-      // Additional wait to ensure overlay is fully gone
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(randomDelay(1000, 2000));
       
       // Force remove any remaining overlay
       await page.evaluate(() => {
         const overlay = document.querySelector('#ccc-overlay');
-        if (overlay) {
-          overlay.remove();
-        }
+        if (overlay) overlay.remove();
         const module = document.querySelector('#ccc');
-        if (module) {
-          module.remove();
-        }
+        if (module) module.remove();
       });
     } catch (error) {
       console.log('No cookie consent popup found or already handled');
-      // Force remove any overlay just in case
       await page.evaluate(() => {
         const overlay = document.querySelector('#ccc-overlay');
-        if (overlay) {
-          overlay.remove();
-        }
+        if (overlay) overlay.remove();
         const module = document.querySelector('#ccc');
-        if (module) {
-          module.remove();
-        }
+        if (module) module.remove();
       });
     }
 
-    // Wait for initial content
-    await page.waitForSelector('.gar-matches-list__day', { timeout: 5000 });
+    // Wait for initial content with random delay
+    await page.waitForSelector('.gar-matches-list__day', { timeout: 10000 });
     console.log('Found match day sections');
     
-    // Wait a short time for dynamic content
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(randomDelay(2000, 4000));
 
-    // DEBUG: Take screenshot and inspect page structure
-    await page.screenshot({ path: 'debug-page-before-april.png' });
-    console.log('Screenshot saved: debug-page-before-april.png');
+    // DEBUG: Take screenshot in development only
+    if (process.env.NODE_ENV !== 'production') {
+      await page.screenshot({ path: 'debug-page-before-april.png' });
+      console.log('Screenshot saved: debug-page-before-april.png');
+    }
 
     // DEBUG: Inspect available navigation elements
     console.log('Inspecting page structure for month navigation...');
@@ -134,10 +254,8 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
     console.log('Looking for April month selector...');
     try {
       const aprilClicked = await page.evaluate(() => {
-        // First, try to find any date/month navigation
         let clicked = false;
         
-        // Look for dropdown selectors first - specifically for April
         const selects = document.querySelectorAll('select');
         for (const select of selects) {
           const options = Array.from(select.options);
@@ -158,12 +276,10 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
         }
         
         if (!clicked) {
-          // Try clicking buttons with April-related text
           const buttons = document.querySelectorAll('button, .btn, [role="button"]');
           for (const button of buttons) {
             const text = button.textContent?.toLowerCase() || '';
             
-            // Look for April specifically
             if (text.includes('april') || text.includes('apr')) {
               console.log(`Found April button: "${button.textContent}"`);
               (button as HTMLElement).click();
@@ -174,13 +290,11 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
         }
         
         if (!clicked) {
-          // Look for backward navigation arrows or previous buttons (to go back to April from current month)
           const buttons = document.querySelectorAll('button, .btn, [role="button"]');
           for (const button of buttons) {
             const text = button.textContent?.toLowerCase() || '';
             const classes = button.className.toLowerCase();
             
-            // Look for backward navigation (left arrow, previous, etc.)
             if (text.includes('‹') || text.includes('<') || text.includes('previous') || text.includes('prev') || 
                 classes.includes('prev') || classes.includes('back') || classes.includes('left')) {
               console.log(`Found backward navigation: "${button.textContent}" class="${button.className}"`);
@@ -191,40 +305,14 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
           }
         }
         
-        if (!clicked) {
-          // Try to find any month navigation by looking for date-related classes
-          const monthElements = document.querySelectorAll('[class*="month"], [class*="date"], [class*="calendar"], [class*="nav"]');
-          for (const element of monthElements) {
-            const buttons = element.querySelectorAll('button, .btn, [role="button"]');
-            for (const button of buttons) {
-              const text = button.textContent?.toLowerCase() || '';
-              const classes = button.className.toLowerCase();
-              
-              // Look for April or backward navigation
-              if (text.includes('april') || text.includes('apr') || 
-                  text.includes('‹') || text.includes('<') || 
-                  classes.includes('prev') || classes.includes('back')) {
-                console.log(`Found month navigation button: "${button.textContent}" class="${button.className}"`);
-                (button as HTMLElement).click();
-                clicked = true;
-                break;
-              }
-            }
-            if (clicked) break;
-          }
-        }
-        
         return clicked;
       });
 
       if (aprilClicked) {
-        console.log('Successfully clicked on month navigation (attempting April)');
-        // Wait for content to load after clicking
-        await page.waitForTimeout(4000);
+        console.log('Successfully clicked on month navigation');
+        await page.waitForTimeout(randomDelay(3000, 6000)); // Random wait after navigation
         
-        // Check if we got April, if not try clicking previous again to reach April
         const currentMonth = await page.evaluate(() => {
-          // Try to detect current month from page content
           const monthIndicators = document.querySelectorAll('[class*="month"], [class*="date"], .gar-matches-list__date');
           for (const indicator of monthIndicators) {
             const text = indicator.textContent?.toLowerCase() || '';
@@ -243,11 +331,9 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
         
         console.log(`Current month appears to be: ${currentMonth}`);
         
-        // If we're not in April yet, try clicking navigation to reach April
         if (currentMonth !== 'april') {
           console.log('Not in April yet, trying to navigate to April...');
           
-          // If we're ahead of April (May, June), go backward
           if (currentMonth === 'may' || currentMonth === 'june') {
             const clickedBack = await page.evaluate(() => {
               const buttons = document.querySelectorAll('button, .btn, [role="button"]');
@@ -266,12 +352,11 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
             });
             
             if (clickedBack) {
-              await page.waitForTimeout(3000);
+              await page.waitForTimeout(randomDelay(3000, 5000));
               console.log('Clicked backward navigation to reach April');
             }
           }
           
-          // If we're before April (March), go forward
           if (currentMonth === 'march') {
             const clickedForward = await page.evaluate(() => {
               const buttons = document.querySelectorAll('button, .btn, [role="button"]');
@@ -290,28 +375,27 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
             });
             
             if (clickedForward) {
-              await page.waitForTimeout(3000);
+              await page.waitForTimeout(randomDelay(3000, 5000));
               console.log('Clicked forward navigation to reach April');
             }
           }
         }
         
-        // Take another screenshot to see what changed
-        await page.screenshot({ path: 'debug-page-after-april.png' });
-        console.log('Screenshot after month navigation saved: debug-page-after-april.png');
+        if (process.env.NODE_ENV !== 'production') {
+          await page.screenshot({ path: 'debug-page-after-april.png' });
+          console.log('Screenshot after month navigation saved');
+        }
         
-        // Wait for matches to load
-        await page.waitForSelector('.gar-match-item', { timeout: 5000 });
+        await page.waitForSelector('.gar-match-item', { timeout: 10000 });
         console.log('Matches loaded after month navigation');
       } else {
         console.log('Could not find any month navigation, proceeding with current data');
         
-        // Try to navigate to a specific April URL if possible
         console.log('Trying direct navigation to April...');
         try {
           await page.goto('https://www.gaa.ie/fixtures-results?month=4', { waitUntil: 'domcontentloaded' });
-          await page.waitForTimeout(3000);
-          await page.waitForSelector('.gar-match-item', { timeout: 5000 });
+          await page.waitForTimeout(randomDelay(3000, 5000));
+          await page.waitForSelector('.gar-match-item', { timeout: 10000 });
           console.log('Successfully navigated to April via URL');
         } catch (urlError) {
           console.log('Direct URL navigation to April failed, using current month data');
@@ -355,6 +439,9 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
             const venue = match.querySelector('.gar-match-item__venue')?.textContent?.trim()?.replace('Venue: ', '') || '';
             const referee = match.querySelector('.gar-match-item__referee')?.textContent?.trim()?.replace('Referee: ', '') || '';
             
+            // Check for broadcasting information
+            const broadcasting = match.querySelector('.gar-match-item__broadcasting')?.textContent?.trim() || '';
+            
             const isFixture = !homeScore && !awayScore;
             
             matches.push({
@@ -367,7 +454,9 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
               venue,
               referee,
               time,
-              isFixture
+              broadcasting,
+              isFixture,
+              scrapedAt: new Date().toISOString()
             });
           });
           
@@ -408,6 +497,9 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
         clickCount++;
         console.log(`Clicking "More results" button (attempt ${clickCount})...`);
 
+        // Add random delay before clicking
+        await page.waitForTimeout(randomDelay(1500, 3500));
+
         // Click using JavaScript and wait for network idle
         await Promise.all([
           page.evaluate(() => {
@@ -416,11 +508,11 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
               button.click();
             }
           }),
-          page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
+          page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {})
         ]);
 
-        // Wait for new content
-        await page.waitForTimeout(2000);
+        // Wait for new content with random delay
+        await page.waitForTimeout(randomDelay(2000, 4000));
         
       } catch (error) {
         console.log('Error clicking More results button:', error);
@@ -430,6 +522,8 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
 
     console.log(`Total clicks: ${clickCount}`);
     console.log(`Final match count: ${allMatches.length}`);
+    console.log('Scraping completed successfully');
+    
     return allMatches;
     
   } catch (error) {

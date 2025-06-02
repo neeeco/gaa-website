@@ -232,13 +232,13 @@ function getTwoWeeksFromNowEnd(): Date {
   return nextWeek.end; // This is the Sunday ending the second week
 }
 
-// Filter matches since May 24th
-function filterMatchesSinceMay24(matches: Match[]): Match[] {
-  const may24 = new Date(2025, 4, 24); // May 24, 2025
+// Filter matches since May 17th (group stage started 1 week earlier)
+function filterMatchesSinceMay17(matches: Match[]): Match[] {
+  const may17 = new Date(2025, 4, 17); // May 17, 2025
   
   return matches.filter(match => {
     const matchDate = parseMatchDate(match);
-    return matchDate >= may24;
+    return matchDate >= may17;
   });
 }
 
@@ -416,9 +416,9 @@ function CompetitionSection({ competition, matches }: { competition: string; mat
 }
 
 function updateGroupDataWithMatches(groups: Group[], matches: Match[]): Group[] {
-  // Filter for All-Ireland SFC matches since May 24th
+  // Filter for All-Ireland SFC matches since May 17th
   const allIrelandSFCMatches = filterAllIrelandSFCMatches(matches);
-  const matchesSinceMay24 = filterMatchesSinceMay24(allIrelandSFCMatches);
+  const matchesSinceMay17 = filterMatchesSinceMay17(allIrelandSFCMatches);
   
   // Create a copy of the groups to avoid mutation
   const updatedGroups = groups.map(group => ({
@@ -427,7 +427,7 @@ function updateGroupDataWithMatches(groups: Group[], matches: Match[]): Group[] 
   }));
   
   // Process each match to update team stats
-  matchesSinceMay24.forEach(match => {
+  matchesSinceMay17.forEach(match => {
     if (match.isFixture || !match.homeScore || !match.awayScore) return; // Only process completed results
     
     // Find the teams in the groups
@@ -488,7 +488,7 @@ function updateGroupDataWithMatches(groups: Group[], matches: Match[]): Group[] 
 
 function isGroupStageComplete(groups: Group[]): boolean {
   return groups.every(group => 
-    group.teams.every(team => team.played >= 3)
+    group.teams.every(team => team.played >= 3) // Each team plays each other once (3 matches total)
   );
 }
 
@@ -503,7 +503,7 @@ function getTeamStatusText(position: number): string {
 }
 
 function GroupTable({ group }: { group: Group }) {
-  const groupComplete = group.teams.every(team => team.played >= 3);
+  const groupComplete = group.teams.every(team => team.played >= 3); // Each team plays 3 matches
   
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -658,7 +658,7 @@ export default function HomePage() {
   const currentUpcomingFixtures = activeSport === 'football' ? groupedUpcomingFixtures.football : groupedUpcomingFixtures.hurling;
   const currentFutureFixtures = activeSport === 'football' ? groupedFutureFixtures.football : groupedFutureFixtures.hurling;
 
-  // Update group data with real match results since May 24th
+  // Update group data with real match results since May 17th
   const updatedGroups = updateGroupDataWithMatches(allIrelandSFCGroups, matches);
   const groupsComplete = isGroupStageComplete(updatedGroups);
 

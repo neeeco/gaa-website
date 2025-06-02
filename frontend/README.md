@@ -4,6 +4,8 @@ A modern web application for viewing GAA (Gaelic Athletic Association) match res
 
 🌐 **Live Site**: [https://gaa.vercel.app/](https://gaa.vercel.app/)
 
+<!-- Updated: Domain renamed from gaa-website to gaa -->
+
 ## Features
 
 - ✅ Latest match results with intelligent fallback system

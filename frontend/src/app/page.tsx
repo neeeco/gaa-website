@@ -57,33 +57,7 @@ function filterAllIrelandSFCMatches(matches: Match[]) {
 function filterSeniorChampionships(matches: Match[]) {
   return matches.filter((match) => {
     const compLower = match.competition.toLowerCase();
-    
-    // Include senior championships
-    if (compLower.includes('senior championship')) {
-      return true;
-    }
-    
-    // Include All-Ireland championships (both senior and other levels)
-    if (compLower.includes('all-ireland') && compLower.includes('championship')) {
-      return true;
-    }
-    
-    // Include provincial championships
-    if (compLower.includes('championship') && 
-        (compLower.includes('leinster') || 
-         compLower.includes('munster') || 
-         compLower.includes('connacht') || 
-         compLower.includes('ulster'))) {
-      return true;
-    }
-    
-    // Include major league competitions
-    if (compLower.includes('allianz') && 
-        (compLower.includes('league') || compLower.includes('hurling league') || compLower.includes('football league'))) {
-      return true;
-    }
-    
-    return false;
+    return compLower.includes('senior championship');
   });
 }
 
@@ -346,24 +320,68 @@ function filterPreviousWeekResults(matches: Match[]): Match[] {
   });
 }
 
-// Get latest results with intelligent fallback
+// Get latest senior championship results with intelligent fallback
 function getLatestResults(matches: Match[]): { results: Match[]; weekLabel: string } {
-  const thisWeekResults = filterThisWeekResults(matches);
+  // Filter to only senior championships first
+  const seniorMatches = matches.filter((match) => {
+    const compLower = match.competition.toLowerCase();
+    return compLower.includes('senior championship');
+  });
+  
+  // Try this week first
+  const thisWeekResults = filterThisWeekResults(seniorMatches);
   if (thisWeekResults.length > 0) {
     return { results: thisWeekResults, weekLabel: "This Week's Results" };
   }
   
-  const lastWeekResults = filterLastWeekResults(matches);
+  // Try last week
+  const lastWeekResults = filterLastWeekResults(seniorMatches);
   if (lastWeekResults.length > 0) {
     return { results: lastWeekResults, weekLabel: "Last Week's Results" };
   }
   
-  const previousWeekResults = filterPreviousWeekResults(matches);
+  // Try previous week
+  const previousWeekResults = filterPreviousWeekResults(seniorMatches);
   if (previousWeekResults.length > 0) {
     return { results: previousWeekResults, weekLabel: "Previous Week's Results" };
   }
   
+  // Keep looking back further in time for senior championship results
+  let weeksBack = 3;
+  const maxWeeksBack = 12; // Don't go back more than 3 months
+  
+  while (weeksBack <= maxWeeksBack) {
+    const weekRange = getWeekRangeNWeeksAgo(weeksBack);
+    const weekResults = seniorMatches.filter(match => {
+      if (match.isFixture) return false; // Only results
+      const matchDate = parseMatchDate(match);
+      return matchDate >= weekRange.start && matchDate <= weekRange.end;
+    });
+    
+    if (weekResults.length > 0) {
+      const weeksAgoText = weeksBack === 1 ? "1 week ago" : `${weeksBack} weeks ago`;
+      return { results: weekResults, weekLabel: `Latest Results (${weeksAgoText})` };
+    }
+    
+    weeksBack++;
+  }
+  
   return { results: [], weekLabel: "Recent Results" };
+}
+
+// Helper function to get week range N weeks ago
+function getWeekRangeNWeeksAgo(weeksAgo: number): { start: Date; end: Date } {
+  const currentWeek = getCurrentWeekRange();
+  
+  const end = new Date(currentWeek.start);
+  end.setDate(currentWeek.start.getDate() - 1 - (7 * (weeksAgo - 1)));
+  end.setHours(23, 59, 59, 999);
+  
+  const start = new Date(end);
+  start.setDate(end.getDate() - 6);
+  start.setHours(0, 0, 0, 0);
+  
+  return { start, end };
 }
 
 // Filter matches for upcoming fixtures (within 2 weeks ending on Sunday)
@@ -732,22 +750,34 @@ export default function HomePage() {
         const competitions = [...new Set(data.map(match => match.competition))];
         console.log('All competitions:', competitions);
         
-        // Debug: Log hurling vs football breakdown
-        const hurlingCompetitions = competitions.filter(comp => 
+        // Debug: Check senior championships specifically
+        const seniorChampionships = competitions.filter(comp => 
+          comp.toLowerCase().includes('senior championship')
+        );
+        console.log('Senior championship competitions found:', seniorChampionships);
+        
+        // Debug: Count senior championship matches
+        const seniorChampionshipMatches = data.filter(match => 
+          match.competition.toLowerCase().includes('senior championship')
+        );
+        console.log('Senior championship matches found:', seniorChampionshipMatches.length);
+        
+        // Debug: Log hurling vs football breakdown for senior championships
+        const hurlingCompetitions = seniorChampionships.filter(comp => 
           comp.toLowerCase().includes('hurling') || 
           comp.toLowerCase().includes('camán') || 
           comp.toLowerCase().includes('iomaint') ||
           comp.toLowerCase().includes('camogie')
         );
-        const footballCompetitions = competitions.filter(comp => 
+        const footballCompetitions = seniorChampionships.filter(comp => 
           comp.toLowerCase().includes('football') || 
           comp.toLowerCase().includes('peil') ||
           comp.toLowerCase().includes('ladies football') ||
           comp.toLowerCase().includes('gaelic football')
         );
         
-        console.log('Hurling competitions found:', hurlingCompetitions);
-        console.log('Football competitions found:', footballCompetitions);
+        console.log('Senior hurling championships found:', hurlingCompetitions);
+        console.log('Senior football championships found:', footballCompetitions);
         
         setMatches(data);
         setLoading(false);
@@ -759,13 +789,11 @@ export default function HomePage() {
       });
   }, []);
 
-  // Filter for senior championships only
+  // Get latest senior championship results with intelligent fallback
+  const { results: latestResults, weekLabel } = getLatestResults(matches);
+  
+  // Apply time-based filtering for fixtures (senior championships only)
   const seniorMatches = filterSeniorChampionships(matches);
-  
-  // Get latest results with intelligent fallback
-  const { results: latestResults, weekLabel } = getLatestResults(seniorMatches);
-  
-  // Apply time-based filtering for fixtures
   const upcomingFixtures = filterUpcomingFixtures(seniorMatches);
   const futureFixtures = filterFutureFixtures(seniorMatches);
   

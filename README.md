@@ -2,6 +2,9 @@
 
 A robust Node.js application that scrapes fixtures and results from the GAA website with enhanced anti-detection measures and persistent data storage for future-proofing.
 
+🌐 **Live Frontend**: [https://gaa.vercel.app/](https://gaa.vercel.app/)  
+🔗 **API Backend**: [https://gaa-website-production.up.railway.app/](https://gaa-website-production.up.railway.app/)
+
 ## 🚀 Features
 
 - **Intelligent Scraping**: Advanced anti-detection measures to avoid bans

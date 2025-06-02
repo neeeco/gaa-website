@@ -1,24 +1,61 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# GAA Results & Fixtures
+
+A modern web application for viewing GAA (Gaelic Athletic Association) match results and fixtures.
+
+🌐 **Live Site**: [https://gaa.vercel.app/](https://gaa.vercel.app/)
+
+## Features
+
+- ✅ Latest match results with intelligent fallback system
+- ✅ Upcoming fixtures (next 2 weeks)
+- ✅ All-Ireland Senior Football Championship group tables
+- ✅ Sport-specific filtering (Football & Hurling)
+- ✅ Professional SVG county logos
+- ✅ Responsive design optimized for all devices
+- ✅ Real-time data from Railway backend
+
+## Technology Stack
+
+- **Frontend**: Next.js 15 with React 19
+- **Styling**: Tailwind CSS 4
+- **Deployment**: Vercel
+- **Backend**: Railway (Express.js + Playwright scraper)
+- **Database**: SQLite with 180-day retention
 
 ## Getting Started
 
-First, run the development server:
-
+Install dependencies:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Run the development server:
+```bash
+npm run dev
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Open [http://localhost:3000](http://localhost:3000) to view the application.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Environment Variables
+
+The application automatically connects to the production API when deployed. For local development, it falls back to `http://localhost:3001`.
+
+## Deployment
+
+The application is automatically deployed to Vercel at [https://gaa.vercel.app/](https://gaa.vercel.app/) when changes are pushed to the main branch.
+
+## Project Structure
+
+```
+frontend/
+├── src/
+│   ├── app/          # Next.js App Router pages
+│   ├── components/   # Reusable React components
+│   ├── services/     # API service functions
+│   └── types/        # TypeScript type definitions
+├── public/           # Static assets
+└── package.json      # Dependencies and scripts
+```
 
 ## Learn More
 

@@ -212,6 +212,36 @@ function getCurrentWeekRange(): { start: Date; end: Date } {
   return { start, end };
 }
 
+// Helper function to get start and end of last week
+function getLastWeekRange(): { start: Date; end: Date } {
+  const currentWeek = getCurrentWeekRange();
+  
+  const end = new Date(currentWeek.start);
+  end.setDate(currentWeek.start.getDate() - 1);
+  end.setHours(23, 59, 59, 999);
+  
+  const start = new Date(end);
+  start.setDate(end.getDate() - 6);
+  start.setHours(0, 0, 0, 0);
+  
+  return { start, end };
+}
+
+// Helper function to get start and end of previous week (week before last week)
+function getPreviousWeekRange(): { start: Date; end: Date } {
+  const lastWeek = getLastWeekRange();
+  
+  const end = new Date(lastWeek.start);
+  end.setDate(lastWeek.start.getDate() - 1);
+  end.setHours(23, 59, 59, 999);
+  
+  const start = new Date(end);
+  start.setDate(end.getDate() - 6);
+  start.setHours(0, 0, 0, 0);
+  
+  return { start, end };
+}
+
 // Helper function to get start and end of next week
 function getNextWeekRange(): { start: Date; end: Date } {
   const currentWeek = getCurrentWeekRange();
@@ -252,6 +282,48 @@ function filterThisWeekResults(matches: Match[]): Match[] {
     const matchDate = parseMatchDate(match);
     return matchDate >= start && matchDate <= end;
   });
+}
+
+// Filter matches for last week's results
+function filterLastWeekResults(matches: Match[]): Match[] {
+  const { start, end } = getLastWeekRange();
+  
+  return matches.filter(match => {
+    if (match.isFixture) return false; // Only results
+    const matchDate = parseMatchDate(match);
+    return matchDate >= start && matchDate <= end;
+  });
+}
+
+// Filter matches for previous week's results (week before last week)
+function filterPreviousWeekResults(matches: Match[]): Match[] {
+  const { start, end } = getPreviousWeekRange();
+  
+  return matches.filter(match => {
+    if (match.isFixture) return false; // Only results
+    const matchDate = parseMatchDate(match);
+    return matchDate >= start && matchDate <= end;
+  });
+}
+
+// Get latest results with intelligent fallback
+function getLatestResults(matches: Match[]): { results: Match[]; weekLabel: string } {
+  const thisWeekResults = filterThisWeekResults(matches);
+  if (thisWeekResults.length > 0) {
+    return { results: thisWeekResults, weekLabel: "This Week's Results" };
+  }
+  
+  const lastWeekResults = filterLastWeekResults(matches);
+  if (lastWeekResults.length > 0) {
+    return { results: lastWeekResults, weekLabel: "Last Week's Results" };
+  }
+  
+  const previousWeekResults = filterPreviousWeekResults(matches);
+  if (previousWeekResults.length > 0) {
+    return { results: previousWeekResults, weekLabel: "Previous Week's Results" };
+  }
+  
+  return { results: [], weekLabel: "Recent Results" };
 }
 
 // Filter matches for upcoming fixtures (within 2 weeks ending on Sunday)
@@ -629,18 +701,20 @@ export default function HomePage() {
   // Filter for senior championships only
   const seniorMatches = filterSeniorChampionships(matches);
   
-  // Apply time-based filtering
-  const thisWeekResults = filterThisWeekResults(seniorMatches);
+  // Get latest results with intelligent fallback
+  const { results: latestResults, weekLabel } = getLatestResults(seniorMatches);
+  
+  // Apply time-based filtering for fixtures
   const upcomingFixtures = filterUpcomingFixtures(seniorMatches);
   const futureFixtures = filterFutureFixtures(seniorMatches);
   
   // Group by sport and competition
-  const groupedResults = groupSeniorChampionships(thisWeekResults);
+  const groupedLatestResults = groupSeniorChampionships(latestResults);
   const groupedUpcomingFixtures = groupSeniorChampionships(upcomingFixtures);
   const groupedFutureFixtures = groupSeniorChampionships(futureFixtures);
 
   // Get current sport data
-  const currentResults = activeSport === 'football' ? groupedResults.football : groupedResults.hurling;
+  const currentLatestResults = activeSport === 'football' ? groupedLatestResults.football : groupedLatestResults.hurling;
   const currentUpcomingFixtures = activeSport === 'football' ? groupedUpcomingFixtures.football : groupedUpcomingFixtures.hurling;
   const currentFutureFixtures = activeSport === 'football' ? groupedFutureFixtures.football : groupedFutureFixtures.hurling;
 
@@ -659,7 +733,7 @@ export default function HomePage() {
               GAA<span className="text-green-600">Score</span>
             </h1>
             <div className="text-sm text-gray-600">
-              This Week&apos;s Results & Upcoming Fixtures
+              Latest Results & Upcoming Fixtures
             </div>
           </div>
 
@@ -735,29 +809,29 @@ export default function HomePage() {
               </section>
             )}
 
-            {/* This Week&apos;s Results Section */}
+            {/* Latest Results Section */}
             <section>
               <div className="flex items-center mb-6">
-                <h2 className="text-xl font-bold text-gray-900">This Week&apos;s Results</h2>
+                <h2 className="text-xl font-bold text-gray-900">{weekLabel}</h2>
                 <div className="ml-3 bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-medium">
-                  {Object.values(currentResults).flat().length} matches
+                  {Object.values(currentLatestResults).flat().length} matches
                 </div>
               </div>
               
-              {Object.keys(currentResults).length === 0 ? (
+              {Object.keys(currentLatestResults).length === 0 ? (
                 <div className="text-center py-12 bg-gray-50 rounded-lg">
                   <div className="text-gray-400 text-lg mb-2">
-                    No results from this week
+                    No results found
                   </div>
                   <p className="text-sm text-gray-500">
-                    Check back after weekend matches
+                    Check back later for updated results
                   </p>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {Object.entries(currentResults).map(([competition, competitionMatches]) => (
+                  {Object.entries(currentLatestResults).map(([competition, competitionMatches]) => (
                     <CompetitionSection
-                      key={`results-${competition}`}
+                      key={`latest-${competition}`}
                       competition={competition}
                       matches={competitionMatches}
                     />

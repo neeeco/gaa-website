@@ -2,9 +2,7 @@
 
 A modern web application for viewing GAA (Gaelic Athletic Association) match results and fixtures.
 
-🌐 **Live Site**: [https://gaa.vercel.app/](https://gaa.vercel.app/)
-
-<!-- Updated: Domain renamed from gaa-website to gaa -->
+🌐 **Live Site**: [https://gaa-website.vercel.app/](https://gaa-website.vercel.app/)
 
 ## Features
 

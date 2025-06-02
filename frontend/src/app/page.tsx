@@ -509,47 +509,59 @@ function parseGAAScore(score: string): number {
 // Helper function to get team logo URL
 function getTeamLogo(teamName: string): string {
   const normalizedName = teamName.toLowerCase().trim();
+  
+  // Use more reliable Wikimedia Commons direct URLs without CORS issues
   const logoMap: Record<string, string> = {
-    'dublin': 'https://upload.wikimedia.org/wikipedia/en/thumb/8/81/Dublin_GAA_crest.svg/120px-Dublin_GAA_crest.svg.png',
-    'kildare': 'https://upload.wikimedia.org/wikipedia/en/thumb/f/f6/Kildare_crest.svg/120px-Kildare_crest.svg.png',
-    'meath': 'https://upload.wikimedia.org/wikipedia/en/thumb/1/14/Meath_crest.svg/120px-Meath_crest.svg.png',
-    'westmeath': 'https://upload.wikimedia.org/wikipedia/en/thumb/9/99/Westmeath_crest.svg/120px-Westmeath_crest.svg.png',
-    'wexford': 'https://upload.wikimedia.org/wikipedia/en/thumb/2/23/Wexford_crest.svg/120px-Wexford_crest.svg.png',
-    'wicklow': 'https://upload.wikimedia.org/wikipedia/en/thumb/1/1a/Wicklow_crest.svg/120px-Wicklow_crest.svg.png',
-    'carlow': 'https://upload.wikimedia.org/wikipedia/en/thumb/2/29/Carlow_crest.svg/120px-Carlow_crest.svg.png',
-    'kilkenny': 'https://upload.wikimedia.org/wikipedia/en/thumb/3/36/Kilkenny_crest.svg/120px-Kilkenny_crest.svg.png',
-    'laois': 'https://upload.wikimedia.org/wikipedia/en/thumb/a/a1/Laois_crest.svg/120px-Laois_crest.svg.png',
-    'longford': 'https://upload.wikimedia.org/wikipedia/en/thumb/f/f9/Longford_crest.svg/120px-Longford_crest.svg.png',
-    'louth': 'https://upload.wikimedia.org/wikipedia/en/thumb/c/c9/Louth_crest.svg/120px-Louth_crest.svg.png',
-    'offaly': 'https://upload.wikimedia.org/wikipedia/en/thumb/0/07/Offaly_crest.svg/120px-Offaly_crest.svg.png',
-    'cork': 'https://upload.wikimedia.org/wikipedia/en/thumb/5/59/Cork_crest.svg/120px-Cork_crest.svg.png',
-    'kerry': 'https://upload.wikimedia.org/wikipedia/en/thumb/7/73/Kerry_crest.svg/120px-Kerry_crest.svg.png',
-    'limerick': 'https://upload.wikimedia.org/wikipedia/en/thumb/8/84/Limerick_crest.svg/120px-Limerick_crest.svg.png',
-    'tipperary': 'https://upload.wikimedia.org/wikipedia/en/thumb/6/65/Tipperary_crest.svg/120px-Tipperary_crest.svg.png',
-    'waterford': 'https://upload.wikimedia.org/wikipedia/en/thumb/4/4a/Waterford_crest.svg/120px-Waterford_crest.svg.png',
-    'clare': 'https://upload.wikimedia.org/wikipedia/en/thumb/3/32/Clare_crest.svg/120px-Clare_crest.svg.png',
-    'galway': 'https://upload.wikimedia.org/wikipedia/en/thumb/2/2e/Galway_crest.svg/120px-Galway_crest.svg.png',
-    'mayo': 'https://upload.wikimedia.org/wikipedia/en/thumb/d/d7/Mayo_crest.svg/120px-Mayo_crest.svg.png',
-    'roscommon': 'https://upload.wikimedia.org/wikipedia/en/thumb/1/1f/Roscommon_crest.svg/120px-Roscommon_crest.svg.png',
-    'sligo': 'https://upload.wikimedia.org/wikipedia/en/thumb/f/f5/Sligo_crest.svg/120px-Sligo_crest.svg.png',
-    'leitrim': 'https://upload.wikimedia.org/wikipedia/en/thumb/1/1e/Leitrim_crest.svg/120px-Leitrim_crest.svg.png',
-    'antrim': 'https://upload.wikimedia.org/wikipedia/en/thumb/3/30/Antrim_crest.svg/120px-Antrim_crest.svg.png',
-    'armagh': 'https://upload.wikimedia.org/wikipedia/en/thumb/7/78/Armagh_crest.svg/120px-Armagh_crest.svg.png',
-    'cavan': 'https://upload.wikimedia.org/wikipedia/en/thumb/b/be/Cavan_crest.svg/120px-Cavan_crest.svg.png',
-    'derry': 'https://upload.wikimedia.org/wikipedia/en/thumb/3/35/Derry_crest.svg/120px-Derry_crest.svg.png',
-    'donegal': 'https://upload.wikimedia.org/wikipedia/en/thumb/0/05/Donegal_crest.svg/120px-Donegal_crest.svg.png',
-    'down': 'https://upload.wikimedia.org/wikipedia/en/thumb/f/f1/Down_crest.svg/120px-Down_crest.svg.png',
-    'fermanagh': 'https://upload.wikimedia.org/wikipedia/en/thumb/6/6a/Fermanagh_crest.svg/120px-Fermanagh_crest.svg.png',
-    'monaghan': 'https://upload.wikimedia.org/wikipedia/en/thumb/b/be/Monaghan_crest.svg/120px-Monaghan_crest.svg.png',
-    'tyrone': 'https://upload.wikimedia.org/wikipedia/en/thumb/b/b9/Tyrone_crest.svg/120px-Tyrone_crest.svg.png',
-    'london': 'https://upload.wikimedia.org/wikipedia/en/thumb/5/5e/London_GAA_crest.svg/120px-London_GAA_crest.svg.png',
-    'new york': 'https://upload.wikimedia.org/wikipedia/en/thumb/1/1f/New_York_GAA_crest.png/120px-New_York_GAA_crest.png',
+    'dublin': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/81/Dublin_GAA_crest.svg/100px-Dublin_GAA_crest.svg.png',
+    'kildare': 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Kildare_crest.svg/100px-Kildare_crest.svg.png',
+    'meath': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Meath_crest.svg/100px-Meath_crest.svg.png',
+    'westmeath': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/Westmeath_crest.svg/100px-Westmeath_crest.svg.png',
+    'wexford': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Wexford_crest.svg/100px-Wexford_crest.svg.png',
+    'wicklow': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Wicklow_crest.svg/100px-Wicklow_crest.svg.png',
+    'carlow': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/Carlow_crest.svg/100px-Carlow_crest.svg.png',
+    'kilkenny': 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/Kilkenny_crest.svg/100px-Kilkenny_crest.svg.png',
+    'laois': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/Laois_crest.svg/100px-Laois_crest.svg.png',
+    'longford': 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Longford_crest.svg/100px-Longford_crest.svg.png',
+    'louth': 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c9/Louth_crest.svg/100px-Louth_crest.svg.png',
+    'offaly': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/07/Offaly_crest.svg/100px-Offaly_crest.svg.png',
+    'cork': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/59/Cork_crest.svg/100px-Cork_crest.svg.png',
+    'kerry': 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/73/Kerry_crest.svg/100px-Kerry_crest.svg.png',
+    'limerick': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/84/Limerick_crest.svg/100px-Limerick_crest.svg.png',
+    'tipperary': 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/65/Tipperary_crest.svg/100px-Tipperary_crest.svg.png',
+    'waterford': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/Waterford_crest.svg/100px-Waterford_crest.svg.png',
+    'clare': 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/32/Clare_crest.svg/100px-Clare_crest.svg.png',
+    'galway': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/Galway_crest.svg/100px-Galway_crest.svg.png',
+    'mayo': 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Mayo_crest.svg/100px-Mayo_crest.svg.png',
+    'roscommon': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/Roscommon_crest.svg/100px-Roscommon_crest.svg.png',
+    'sligo': 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f5/Sligo_crest.svg/100px-Sligo_crest.svg.png',
+    'leitrim': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/Leitrim_crest.svg/100px-Leitrim_crest.svg.png',
+    'antrim': 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Antrim_crest.svg/100px-Antrim_crest.svg.png',
+    'armagh': 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/78/Armagh_crest.svg/100px-Armagh_crest.svg.png',
+    'cavan': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/be/Cavan_crest.svg/100px-Cavan_crest.svg.png',
+    'derry': 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/35/Derry_crest.svg/100px-Derry_crest.svg.png',
+    'donegal': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Donegal_crest.svg/100px-Donegal_crest.svg.png',
+    'down': 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f1/Down_crest.svg/100px-Down_crest.svg.png',
+    'fermanagh': 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6a/Fermanagh_crest.svg/100px-Fermanagh_crest.svg.png',
+    'monaghan': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/be/Monaghan_crest.svg/100px-Monaghan_crest.svg.png',
+    'tyrone': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/Tyrone_crest.svg/100px-Tyrone_crest.svg.png',
+    'london': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/London_GAA_crest.svg/100px-London_GAA_crest.svg.png',
+    'new york': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/New_York_GAA_crest.png/100px-New_York_GAA_crest.png',
   };
-  if (logoMap[normalizedName]) return logoMap[normalizedName];
-  for (const [county, logoUrl] of Object.entries(logoMap)) {
-    if (normalizedName.includes(county)) return logoUrl;
+
+  // Direct match
+  if (logoMap[normalizedName]) {
+    return logoMap[normalizedName];
   }
-  return 'https://upload.wikimedia.org/wikipedia/en/thumb/c/cd/Gaa_crest.svg/120px-Gaa_crest.svg.png';
+
+  // Partial match - check if team name contains county name
+  for (const [county, logoUrl] of Object.entries(logoMap)) {
+    if (normalizedName.includes(county)) {
+      return logoUrl;
+    }
+  }
+
+  // Fallback to GAA logo
+  return 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Gaa_crest.svg/100px-Gaa_crest.svg.png';
 }
 
 function MatchRow({ match }: { match: Match }) {
@@ -571,7 +583,7 @@ function MatchRow({ match }: { match: Match }) {
                 className="w-6 h-6 mr-3 flex-shrink-0 rounded"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
-                  target.src = 'https://upload.wikimedia.org/wikipedia/en/thumb/c/cd/Gaa_crest.svg/120px-Gaa_crest.svg.png';
+                  target.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Gaa_crest.svg/100px-Gaa_crest.svg.png';
                 }}
               />
               <span className="font-medium text-gray-900 truncate">{match.homeTeam}</span>
@@ -599,7 +611,7 @@ function MatchRow({ match }: { match: Match }) {
                 className="w-6 h-6 mr-3 flex-shrink-0 rounded"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
-                  target.src = 'https://upload.wikimedia.org/wikipedia/en/thumb/c/cd/Gaa_crest.svg/120px-Gaa_crest.svg.png';
+                  target.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Gaa_crest.svg/100px-Gaa_crest.svg.png';
                 }}
               />
               <span className="font-medium text-gray-900 truncate">{match.awayTeam}</span>
@@ -780,7 +792,7 @@ function GroupTable({ group }: { group: Group }) {
                         className="w-5 h-5 mr-2 flex-shrink-0 rounded"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
-                          target.src = 'https://upload.wikimedia.org/wikipedia/en/thumb/c/cd/Gaa_crest.svg/120px-Gaa_crest.svg.png';
+                          target.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Gaa_crest.svg/100px-Gaa_crest.svg.png';
                         }}
                       />
                       <span className="font-medium text-gray-900">{team.name}</span>

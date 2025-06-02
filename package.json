@@ -3,12 +3,17 @@
   "version": "1.0.0",
   "description": "GAA fixtures and results scraper",
   "main": "dist/server.js",
+  "engines": {
+    "node": "18.x",
+    "npm": "9.x"
+  },
   "scripts": {
     "start": "node dist/server.js",
     "dev": "ts-node src/server.ts",
     "build": "tsc",
     "test": "jest",
-    "backup": "ts-node src/backup-data.ts"
+    "backup": "ts-node src/backup-data.ts",
+    "postinstall": "npm run build"
   },
   "dependencies": {
     "cors": "^2.8.5",

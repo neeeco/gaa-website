@@ -506,62 +506,62 @@ function parseGAAScore(score: string): number {
   return parseInt(score) || 0;
 }
 
-// Helper function to get team logo URL
-function getTeamLogo(teamName: string): string {
+// Helper function to get team logo - now using CSS-based badges with county initials
+function getTeamLogo(teamName: string): { initials: string; color: string } {
   const normalizedName = teamName.toLowerCase().trim();
   
-  // Use more reliable Wikimedia Commons direct URLs without CORS issues
-  const logoMap: Record<string, string> = {
-    'dublin': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/81/Dublin_GAA_crest.svg/100px-Dublin_GAA_crest.svg.png',
-    'kildare': 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Kildare_crest.svg/100px-Kildare_crest.svg.png',
-    'meath': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Meath_crest.svg/100px-Meath_crest.svg.png',
-    'westmeath': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/Westmeath_crest.svg/100px-Westmeath_crest.svg.png',
-    'wexford': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Wexford_crest.svg/100px-Wexford_crest.svg.png',
-    'wicklow': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Wicklow_crest.svg/100px-Wicklow_crest.svg.png',
-    'carlow': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/Carlow_crest.svg/100px-Carlow_crest.svg.png',
-    'kilkenny': 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/Kilkenny_crest.svg/100px-Kilkenny_crest.svg.png',
-    'laois': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/Laois_crest.svg/100px-Laois_crest.svg.png',
-    'longford': 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Longford_crest.svg/100px-Longford_crest.svg.png',
-    'louth': 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c9/Louth_crest.svg/100px-Louth_crest.svg.png',
-    'offaly': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/07/Offaly_crest.svg/100px-Offaly_crest.svg.png',
-    'cork': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/59/Cork_crest.svg/100px-Cork_crest.svg.png',
-    'kerry': 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/73/Kerry_crest.svg/100px-Kerry_crest.svg.png',
-    'limerick': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/84/Limerick_crest.svg/100px-Limerick_crest.svg.png',
-    'tipperary': 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/65/Tipperary_crest.svg/100px-Tipperary_crest.svg.png',
-    'waterford': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/Waterford_crest.svg/100px-Waterford_crest.svg.png',
-    'clare': 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/32/Clare_crest.svg/100px-Clare_crest.svg.png',
-    'galway': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/Galway_crest.svg/100px-Galway_crest.svg.png',
-    'mayo': 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Mayo_crest.svg/100px-Mayo_crest.svg.png',
-    'roscommon': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/Roscommon_crest.svg/100px-Roscommon_crest.svg.png',
-    'sligo': 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f5/Sligo_crest.svg/100px-Sligo_crest.svg.png',
-    'leitrim': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/Leitrim_crest.svg/100px-Leitrim_crest.svg.png',
-    'antrim': 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Antrim_crest.svg/100px-Antrim_crest.svg.png',
-    'armagh': 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/78/Armagh_crest.svg/100px-Armagh_crest.svg.png',
-    'cavan': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/be/Cavan_crest.svg/100px-Cavan_crest.svg.png',
-    'derry': 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/35/Derry_crest.svg/100px-Derry_crest.svg.png',
-    'donegal': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Donegal_crest.svg/100px-Donegal_crest.svg.png',
-    'down': 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f1/Down_crest.svg/100px-Down_crest.svg.png',
-    'fermanagh': 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6a/Fermanagh_crest.svg/100px-Fermanagh_crest.svg.png',
-    'monaghan': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/be/Monaghan_crest.svg/100px-Monaghan_crest.svg.png',
-    'tyrone': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/Tyrone_crest.svg/100px-Tyrone_crest.svg.png',
-    'london': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/London_GAA_crest.svg/100px-London_GAA_crest.svg.png',
-    'new york': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/New_York_GAA_crest.png/100px-New_York_GAA_crest.png',
+  // County colors based on traditional GAA county colors
+  const countyInfo: Record<string, { initials: string; color: string }> = {
+    'dublin': { initials: 'DUB', color: '#4A90E2' }, // Sky blue
+    'kildare': { initials: 'KIL', color: '#6B7280' }, // Gray (was white)
+    'meath': { initials: 'MEA', color: '#228B22' }, // Green
+    'westmeath': { initials: 'WES', color: '#8B0000' }, // Maroon
+    'wexford': { initials: 'WEX', color: '#B45309' }, // Dark gold (was gold)
+    'wicklow': { initials: 'WIC', color: '#0000FF' }, // Blue
+    'carlow': { initials: 'CAR', color: '#228B22' }, // Green
+    'kilkenny': { initials: 'KK', color: '#B45309' }, // Dark gold (was gold)
+    'laois': { initials: 'LAO', color: '#0000FF' }, // Blue
+    'longford': { initials: 'LF', color: '#B45309' }, // Dark gold (was gold)
+    'louth': { initials: 'LOU', color: '#DC143C' }, // Red
+    'offaly': { initials: 'OFF', color: '#228B22' }, // Green
+    'cork': { initials: 'COR', color: '#DC143C' }, // Red
+    'kerry': { initials: 'KER', color: '#228B22' }, // Green
+    'limerick': { initials: 'LIM', color: '#228B22' }, // Green
+    'tipperary': { initials: 'TIP', color: '#0000FF' }, // Blue
+    'waterford': { initials: 'WAT', color: '#0000FF' }, // Blue
+    'clare': { initials: 'CLA', color: '#B45309' }, // Dark gold (was gold)
+    'galway': { initials: 'GAL', color: '#8B0000' }, // Maroon
+    'mayo': { initials: 'MAY', color: '#228B22' }, // Green
+    'roscommon': { initials: 'ROS', color: '#B45309' }, // Dark gold (was gold)
+    'sligo': { initials: 'SLI', color: '#000000' }, // Black
+    'leitrim': { initials: 'LEI', color: '#228B22' }, // Green
+    'antrim': { initials: 'ANT', color: '#B45309' }, // Dark gold (was gold)
+    'armagh': { initials: 'ARM', color: '#FF8C00' }, // Orange
+    'cavan': { initials: 'CAV', color: '#0000FF' }, // Blue
+    'derry': { initials: 'DER', color: '#DC143C' }, // Red
+    'donegal': { initials: 'DON', color: '#228B22' }, // Green
+    'down': { initials: 'DOW', color: '#DC143C' }, // Red
+    'fermanagh': { initials: 'FER', color: '#228B22' }, // Green
+    'monaghan': { initials: 'MON', color: '#0000FF' }, // Blue
+    'tyrone': { initials: 'TYR', color: '#DC143C' }, // Red
+    'london': { initials: 'LON', color: '#228B22' }, // Green
+    'new york': { initials: 'NY', color: '#0000FF' }, // Blue
   };
 
   // Direct match
-  if (logoMap[normalizedName]) {
-    return logoMap[normalizedName];
+  if (countyInfo[normalizedName]) {
+    return countyInfo[normalizedName];
   }
 
   // Partial match - check if team name contains county name
-  for (const [county, logoUrl] of Object.entries(logoMap)) {
+  for (const [county, info] of Object.entries(countyInfo)) {
     if (normalizedName.includes(county)) {
-      return logoUrl;
+      return info;
     }
   }
 
-  // Fallback to GAA logo
-  return 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Gaa_crest.svg/100px-Gaa_crest.svg.png';
+  // Fallback
+  return { initials: 'GAA', color: '#228B22' };
 }
 
 function MatchRow({ match }: { match: Match }) {
@@ -577,22 +577,13 @@ function MatchRow({ match }: { match: Match }) {
           {/* Home Team Row */}
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center flex-1 min-w-0 mr-4">
-              <img 
-                src={getTeamLogo(match.homeTeam)} 
-                alt={`${match.homeTeam} logo`}
-                className="w-6 h-6 mr-3 flex-shrink-0 rounded"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  if (!target.dataset.fallbackAttempted) {
-                    target.dataset.fallbackAttempted = 'true';
-                    target.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Gaa_crest.svg/100px-Gaa_crest.svg.png';
-                  } else {
-                    // Final fallback: transparent 1x1 pixel to stop infinite loops
-                    target.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-                    target.style.display = 'none';
-                  }
-                }}
-              />
+              <div 
+                className="w-6 h-6 mr-3 flex-shrink-0 rounded flex items-center justify-center text-white text-xs font-bold"
+                style={{ backgroundColor: getTeamLogo(match.homeTeam).color }}
+                title={`${match.homeTeam} logo`}
+              >
+                {getTeamLogo(match.homeTeam).initials}
+              </div>
               <span className="font-medium text-gray-900 truncate">{match.homeTeam}</span>
               {isLive && (
                 <span className="ml-2 bg-red-500 text-white text-xs px-2 py-1 rounded font-bold flex-shrink-0">
@@ -611,23 +602,14 @@ function MatchRow({ match }: { match: Match }) {
           
           {/* Away Team Row */}
           <div className="flex items-center justify-between">
-            <div className="flex-1 min-w-0 mr-4">
-              <img 
-                src={getTeamLogo(match.awayTeam)} 
-                alt={`${match.awayTeam} logo`}
-                className="w-6 h-6 mr-3 flex-shrink-0 rounded"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  if (!target.dataset.fallbackAttempted) {
-                    target.dataset.fallbackAttempted = 'true';
-                    target.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Gaa_crest.svg/100px-Gaa_crest.svg.png';
-                  } else {
-                    // Final fallback: transparent 1x1 pixel to stop infinite loops
-                    target.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-                    target.style.display = 'none';
-                  }
-                }}
-              />
+            <div className="flex items-center flex-1 min-w-0 mr-4">
+              <div 
+                className="w-6 h-6 mr-3 flex-shrink-0 rounded flex items-center justify-center text-white text-xs font-bold"
+                style={{ backgroundColor: getTeamLogo(match.awayTeam).color }}
+                title={`${match.awayTeam} logo`}
+              >
+                {getTeamLogo(match.awayTeam).initials}
+              </div>
               <span className="font-medium text-gray-900 truncate">{match.awayTeam}</span>
             </div>
             <div className={`text-right font-bold w-16 ${isLive ? 'text-gray-400' : 'text-gray-900'}`}>
@@ -700,8 +682,8 @@ function updateGroupDataWithMatches(groups: Group[], matches: Match[]): Group[] 
     awayTeamData.played++;
     
     homeTeamData.for += homeScore;
-    homeTeamData.against += awayScore;
     awayTeamData.for += awayScore;
+    homeTeamData.against += awayScore;
     awayTeamData.against += homeScore;
     
     // Determine winner and update points
@@ -800,22 +782,13 @@ function GroupTable({ group }: { group: Group }) {
                   <td className="px-3 py-2">
                     <div className="flex items-center">
                       <span className="mr-2 text-xs">{statusIcon}</span>
-                      <img 
-                        src={getTeamLogo(team.name)} 
-                        alt={`${team.name} logo`}
-                        className="w-5 h-5 mr-2 flex-shrink-0 rounded"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          if (!target.dataset.fallbackAttempted) {
-                            target.dataset.fallbackAttempted = 'true';
-                            target.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Gaa_crest.svg/100px-Gaa_crest.svg.png';
-                          } else {
-                            // Final fallback: transparent 1x1 pixel to stop infinite loops
-                            target.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-                            target.style.display = 'none';
-                          }
-                        }}
-                      />
+                      <div 
+                        className="w-5 h-5 mr-2 flex-shrink-0 rounded flex items-center justify-center text-white text-xs font-bold"
+                        style={{ backgroundColor: getTeamLogo(team.name).color }}
+                        title={`${team.name} logo`}
+                      >
+                        {getTeamLogo(team.name).initials}
+                      </div>
                       <span className="font-medium text-gray-900">{team.name}</span>
                     </div>
                   </td>

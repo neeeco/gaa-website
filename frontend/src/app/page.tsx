@@ -57,7 +57,33 @@ function filterAllIrelandSFCMatches(matches: Match[]) {
 function filterSeniorChampionships(matches: Match[]) {
   return matches.filter((match) => {
     const compLower = match.competition.toLowerCase();
-    return compLower.includes('senior championship');
+    
+    // Include senior championships
+    if (compLower.includes('senior championship')) {
+      return true;
+    }
+    
+    // Include All-Ireland championships (both senior and other levels)
+    if (compLower.includes('all-ireland') && compLower.includes('championship')) {
+      return true;
+    }
+    
+    // Include provincial championships
+    if (compLower.includes('championship') && 
+        (compLower.includes('leinster') || 
+         compLower.includes('munster') || 
+         compLower.includes('connacht') || 
+         compLower.includes('ulster'))) {
+      return true;
+    }
+    
+    // Include major league competitions
+    if (compLower.includes('allianz') && 
+        (compLower.includes('league') || compLower.includes('hurling league') || compLower.includes('football league'))) {
+      return true;
+    }
+    
+    return false;
   });
 }
 
@@ -138,12 +164,26 @@ function groupSeniorChampionships(matches: Match[]) {
     const compLower = match.competition.toLowerCase();
     let sport: 'hurling' | 'football';
     
-    if (compLower.includes('hurling')) {
+    // More comprehensive sport detection
+    if (compLower.includes('hurling') || 
+        compLower.includes('camán') || 
+        compLower.includes('iomaint') ||
+        compLower.includes('camogie')) {
       sport = 'hurling';
-    } else if (compLower.includes('football')) {
+    } else if (compLower.includes('football') || 
+               compLower.includes('peil') ||
+               compLower.includes('ladies football') ||
+               compLower.includes('gaelic football')) {
       sport = 'football';
     } else {
-      return; // Skip non-hurling/football championships
+      // If sport is unclear, make an educated guess based on competition patterns
+      // Some competitions might not explicitly mention the sport
+      if (compLower.includes('minor') || compLower.includes('under') || compLower.includes('u-')) {
+        // For age-grade competitions, we'll need to check team names or default to football
+        sport = 'football'; // Default to football for unclear cases
+      } else {
+        return; // Skip if we can't determine the sport
+      }
     }
 
     const competition = match.competition;
@@ -687,6 +727,27 @@ export default function HomePage() {
       .then((data) => {
         console.log('Matches received:', data.length);
         console.log('Sample match:', data[0]);
+        
+        // Debug: Log competition names to understand what we have
+        const competitions = [...new Set(data.map(match => match.competition))];
+        console.log('All competitions:', competitions);
+        
+        // Debug: Log hurling vs football breakdown
+        const hurlingCompetitions = competitions.filter(comp => 
+          comp.toLowerCase().includes('hurling') || 
+          comp.toLowerCase().includes('camán') || 
+          comp.toLowerCase().includes('iomaint') ||
+          comp.toLowerCase().includes('camogie')
+        );
+        const footballCompetitions = competitions.filter(comp => 
+          comp.toLowerCase().includes('football') || 
+          comp.toLowerCase().includes('peil') ||
+          comp.toLowerCase().includes('ladies football') ||
+          comp.toLowerCase().includes('gaelic football')
+        );
+        
+        console.log('Hurling competitions found:', hurlingCompetitions);
+        console.log('Football competitions found:', footballCompetitions);
         
         setMatches(data);
         setLoading(false);

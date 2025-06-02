@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 
 const app = express();
-const port = process.env.PORT || 3001;
+const port = parseInt(process.env.PORT || '3001', 10);
 
 // Enable CORS
 app.use(cors());
@@ -341,8 +341,8 @@ process.on('SIGTERM', async () => {
     process.exit(0);
 });
 
-app.listen(port, () => {
-    console.log(`Server running at http://localhost:${port}`);
+app.listen(port, '0.0.0.0', () => {
+    console.log(`Server running at http://0.0.0.0:${port}`);
     console.log('Available endpoints:');
     console.log('  GET  /health - Health check with database status');
     console.log('  GET  /api/matches - Get matches (with database fallback)');

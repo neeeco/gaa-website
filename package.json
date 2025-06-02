@@ -2,9 +2,10 @@
   "name": "gaa-website",
   "version": "1.0.0",
   "description": "GAA fixtures and results scraper",
-  "main": "index.js",
+  "main": "dist/server.js",
   "scripts": {
-    "start": "ts-node src/index.ts",
+    "start": "node dist/server.js",
+    "dev": "ts-node src/server.ts",
     "build": "tsc",
     "test": "jest",
     "backup": "ts-node src/backup-data.ts"

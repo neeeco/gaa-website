@@ -321,51 +321,48 @@ function filterPreviousWeekResults(matches: Match[]): Match[] {
 }
 
 // Get latest senior championship results with intelligent fallback that looks back in time
-function getLatestResults(matches: Match[]): { results: Match[]; weekLabel: string } {
+function getLatestResults(matches: Match[], sport: 'football' | 'hurling'): { results: Match[]; weekLabel: string } {
   // Filter to only senior championships first
   const seniorMatches = matches.filter((match) => {
     const compLower = match.competition.toLowerCase();
     return compLower.includes('senior championship');
   });
   
-  console.log('Total senior championship matches for fallback:', seniorMatches.length);
-  
-  // Log hurling vs football breakdown
-  const hurlingMatches = seniorMatches.filter(match => {
+  // Then filter by sport
+  const sportMatches = seniorMatches.filter(match => {
     const compLower = match.competition.toLowerCase();
-    return compLower.includes('hurling') || 
-           compLower.includes('camán') || 
-           compLower.includes('iomaint') ||
-           compLower.includes('camogie');
-  });
-  const footballMatches = seniorMatches.filter(match => {
-    const compLower = match.competition.toLowerCase();
-    return compLower.includes('football') || 
-           compLower.includes('peil') ||
-           compLower.includes('ladies football') ||
-           compLower.includes('gaelic football');
+    if (sport === 'hurling') {
+      return compLower.includes('hurling') || 
+             compLower.includes('camán') || 
+             compLower.includes('iomaint') ||
+             compLower.includes('camogie');
+    } else {
+      return compLower.includes('football') || 
+             compLower.includes('peil') ||
+             compLower.includes('ladies football') ||
+             compLower.includes('gaelic football');
+    }
   });
   
-  console.log('Senior hurling matches found:', hurlingMatches.length);
-  console.log('Senior football matches found:', footballMatches.length);
+  console.log(`Total ${sport} senior championship matches for fallback:`, sportMatches.length);
   
   // Try this week first
-  const thisWeekResults = filterThisWeekResults(seniorMatches);
-  console.log('This week senior championship results:', thisWeekResults.length);
+  const thisWeekResults = filterThisWeekResults(sportMatches);
+  console.log(`This week ${sport} senior championship results:`, thisWeekResults.length);
   if (thisWeekResults.length > 0) {
     return { results: thisWeekResults, weekLabel: "This Week's Results" };
   }
   
   // Try last week
-  const lastWeekResults = filterLastWeekResults(seniorMatches);
-  console.log('Last week senior championship results:', lastWeekResults.length);
+  const lastWeekResults = filterLastWeekResults(sportMatches);
+  console.log(`Last week ${sport} senior championship results:`, lastWeekResults.length);
   if (lastWeekResults.length > 0) {
     return { results: lastWeekResults, weekLabel: "Last Week's Results" };
   }
   
   // Try previous week
-  const previousWeekResults = filterPreviousWeekResults(seniorMatches);
-  console.log('Previous week senior championship results:', previousWeekResults.length);
+  const previousWeekResults = filterPreviousWeekResults(sportMatches);
+  console.log(`Previous week ${sport} senior championship results:`, previousWeekResults.length);
   if (previousWeekResults.length > 0) {
     return { results: previousWeekResults, weekLabel: "Previous Week's Results" };
   }
@@ -374,28 +371,28 @@ function getLatestResults(matches: Match[]): { results: Match[]; weekLabel: stri
   let weeksBack = 4; // Start from 4 weeks back since we already checked 1-3
   const maxWeeksBack = 52; // Look back up to 1 year
   
-  console.log('Looking further back in time for senior championship results...');
+  console.log(`Looking further back in time for ${sport} senior championship results...`);
   
   while (weeksBack <= maxWeeksBack) {
     const weekRange = getWeekRangeNWeeksAgo(weeksBack);
-    const weekResults = seniorMatches.filter(match => {
+    const weekResults = sportMatches.filter(match => {
       if (match.isFixture) return false; // Only results
       const matchDate = parseMatchDate(match);
       return matchDate >= weekRange.start && matchDate <= weekRange.end;
     });
     
-    console.log(`Week ${weeksBack} ago: ${weekResults.length} senior championship results`);
+    console.log(`Week ${weeksBack} ago: ${weekResults.length} ${sport} senior championship results`);
     
     if (weekResults.length > 0) {
       const weeksAgoText = weeksBack === 1 ? "1 week ago" : `${weeksBack} weeks ago`;
-      console.log(`Found senior championship results from ${weeksAgoText}`);
+      console.log(`Found ${sport} senior championship results from ${weeksAgoText}`);
       return { results: weekResults, weekLabel: `Latest Results (${weeksAgoText})` };
     }
     
     weeksBack++;
   }
   
-  console.log('No senior championship results found in the past year');
+  console.log(`No ${sport} senior championship results found in the past year`);
   return { results: [], weekLabel: "No Recent Results" };
 }
 
@@ -824,7 +821,7 @@ export default function HomePage() {
   }, []);
 
   // Get latest senior championship results with intelligent fallback
-  const { results: latestResults, weekLabel } = getLatestResults(matches);
+  const { results: latestResults, weekLabel } = getLatestResults(matches, activeSport);
   
   // Apply time-based filtering for fixtures (senior championships only)
   const seniorMatches = filterSeniorChampionships(matches);

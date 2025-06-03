@@ -671,33 +671,68 @@ function CompetitionSection({ competition, matches }: { competition: string; mat
   );
 }
 
-function updateGroupDataWithMatches(groups: Group[], matches: Match[]): Group[] {
+// Enhanced GroupTeam interface to track head-to-head results
+interface EnhancedGroupTeam extends GroupTeam {
+  headToHead: Record<string, { won: boolean; lost: boolean; drawn: boolean }>;
+  positionSecured?: boolean; // Whether this team's position is already determined
+  securedReason?: string; // Reason why position is secured
+}
+
+// Enhanced Group interface
+interface EnhancedGroup extends Omit<Group, 'teams'> {
+  teams: EnhancedGroupTeam[];
+}
+
+function updateGroupDataWithMatches(groups: Group[], matches: Match[]): EnhancedGroup[] {
   // Filter for All-Ireland SFC matches since May 17th
   const allIrelandSFCMatches = filterAllIrelandSFCMatches(matches);
   const matchesSinceMay17 = filterMatchesSinceMay17(allIrelandSFCMatches);
   
-  // Create a copy of the groups to avoid mutation
-  const updatedGroups = groups.map(group => ({
+  // Create enhanced groups with head-to-head tracking
+  const updatedGroups: EnhancedGroup[] = groups.map(group => ({
     ...group,
-    teams: group.teams.map(team => ({ ...team }))
+    teams: group.teams.map(team => ({
+      ...team,
+      headToHead: {},
+      positionSecured: false,
+      securedReason: ''
+    }))
   }));
   
-  // Process each match to update team stats
+  // Initialize head-to-head records
+  updatedGroups.forEach(group => {
+    group.teams.forEach(teamA => {
+      group.teams.forEach(teamB => {
+        if (teamA.name !== teamB.name) {
+          teamA.headToHead[teamB.name] = { won: false, lost: false, drawn: false };
+        }
+      });
+    });
+  });
+  
+  // Process each match to update team stats and head-to-head records
   matchesSinceMay17.forEach(match => {
     if (match.isFixture || !match.homeScore || !match.awayScore) return; // Only process completed results
     
     // Find the teams in the groups
-    let homeTeamData: GroupTeam | null = null;
-    let awayTeamData: GroupTeam | null = null;
+    let homeTeamData: EnhancedGroupTeam | null = null;
+    let awayTeamData: EnhancedGroupTeam | null = null;
+    let matchGroup: EnhancedGroup | null = null;
     
     for (const group of updatedGroups) {
       for (const team of group.teams) {
-        if (team.name === match.homeTeam) homeTeamData = team;
-        if (team.name === match.awayTeam) awayTeamData = team;
+        if (team.name === match.homeTeam) {
+          homeTeamData = team;
+          matchGroup = group;
+        }
+        if (team.name === match.awayTeam) {
+          awayTeamData = team;
+          matchGroup = group;
+        }
       }
     }
     
-    if (!homeTeamData || !awayTeamData) return; // Teams not found in groups
+    if (!homeTeamData || !awayTeamData || !matchGroup) return; // Teams not found in groups
     
     // Parse GAA scores (e.g., "3-18" -> 27 total points)
     const homeScore = parseGAAScore(match.homeScore);
@@ -712,53 +747,153 @@ function updateGroupDataWithMatches(groups: Group[], matches: Match[]): Group[] 
     homeTeamData.against += awayScore;
     awayTeamData.against += homeScore;
     
-    // Determine winner and update points
+    // Determine winner and update points + head-to-head
     if (homeScore > awayScore) {
       homeTeamData.won++;
       homeTeamData.points += 2;
       awayTeamData.lost++;
+      // Update head-to-head
+      homeTeamData.headToHead[awayTeamData.name].won = true;
+      awayTeamData.headToHead[homeTeamData.name].lost = true;
     } else if (awayScore > homeScore) {
       awayTeamData.won++;
       awayTeamData.points += 2;
       homeTeamData.lost++;
+      // Update head-to-head
+      awayTeamData.headToHead[homeTeamData.name].won = true;
+      homeTeamData.headToHead[awayTeamData.name].lost = true;
     } else {
       homeTeamData.drawn++;
       awayTeamData.drawn++;
       homeTeamData.points += 1;
       awayTeamData.points += 1;
+      // Update head-to-head
+      homeTeamData.headToHead[awayTeamData.name].drawn = true;
+      awayTeamData.headToHead[homeTeamData.name].drawn = true;
     }
   });
   
-  // Sort teams within each group by points (descending), then by goal difference
+  // Sort teams within each group using head-to-head tiebreaking
   updatedGroups.forEach(group => {
     group.teams.sort((a, b) => {
+      // First: Points
       if (a.points !== b.points) return b.points - a.points;
+      
+      // Second: Head-to-head result if they played each other
+      const aVsB = a.headToHead[b.name];
+      if (aVsB) {
+        if (aVsB.won) return -1; // a beats b
+        if (aVsB.lost) return 1;  // b beats a
+        // If drawn or not played, continue to next tiebreaker
+      }
+      
+      // Third: Goal difference
       const aDiff = a.for - a.against;
       const bDiff = b.for - b.against;
-      return bDiff - aDiff;
+      if (aDiff !== bDiff) return bDiff - aDiff;
+      
+      // Fourth: Goals scored
+      return b.for - a.for;
     });
+  });
+  
+  // Determine secured positions based on completed matches and head-to-head results
+  updatedGroups.forEach(group => {
+    const groupComplete = group.teams.every(team => team.played >= 3);
+    
+    if (groupComplete) {
+      // Group stage is complete - all positions are secured
+      group.teams.forEach((team, index) => {
+        team.positionSecured = true;
+        team.securedReason = 'Group stage complete';
+      });
+    } else {
+      // Check for early qualification/elimination scenarios
+      group.teams.forEach((team, index) => {
+        // Check if team has already secured qualification (1st place)
+        if (index === 0) {
+          const canBeOvertaken = group.teams.slice(1).some(otherTeam => {
+            const maxPossiblePoints = otherTeam.points + (3 - otherTeam.played) * 2;
+            if (maxPossiblePoints <= team.points) return false;
+            
+            // If they could tie on points, check head-to-head
+            if (maxPossiblePoints === team.points + (3 - team.played) * 2) {
+              const h2h = team.headToHead[otherTeam.name];
+              if (h2h && (h2h.won || h2h.lost)) {
+                // Head-to-head already decided
+                return h2h.lost; // Can only be overtaken if they lost head-to-head
+              }
+            }
+            return true; // Could potentially be overtaken
+          });
+          
+          if (!canBeOvertaken) {
+            team.positionSecured = true;
+            team.securedReason = 'Cannot be overtaken';
+          }
+        }
+        
+        // Check if team has already secured playoff spot (top 3)
+        if (index <= 2) {
+          const canBeDroppedOut = group.teams.slice(3).some(otherTeam => {
+            const maxPossiblePoints = otherTeam.points + (3 - otherTeam.played) * 2;
+            if (maxPossiblePoints < team.points) return false;
+            
+            // If they could tie on points, check head-to-head
+            if (maxPossiblePoints === team.points + (3 - team.played) * 2) {
+              const h2h = team.headToHead[otherTeam.name];
+              if (h2h && (h2h.won || h2h.lost)) {
+                // Head-to-head already decided
+                return h2h.lost; // Can only be dropped if they lost head-to-head
+              }
+            }
+            return true; // Could potentially be dropped
+          });
+          
+          if (!canBeDroppedOut && !team.positionSecured) {
+            team.positionSecured = true;
+            team.securedReason = index === 0 ? 'Qualified' : 'Playoff secured';
+          }
+        }
+        
+        // Check if team is already relegated (4th place)
+        if (index === 3) {
+          const canEscapeRelegation = group.teams.slice(0, 3).some(otherTeam => {
+            const minPossiblePoints = otherTeam.points; // If they lose remaining games
+            const teamMaxPoints = team.points + (3 - team.played) * 2;
+            
+            if (teamMaxPoints < minPossiblePoints) return false;
+            
+            // If they could tie on points, check head-to-head
+            if (teamMaxPoints === minPossiblePoints) {
+              const h2h = team.headToHead[otherTeam.name];
+              if (h2h && (h2h.won || h2h.lost)) {
+                // Head-to-head already decided
+                return h2h.won; // Can only escape if they won head-to-head
+              }
+            }
+            return true; // Could potentially escape relegation
+          });
+          
+          if (!canEscapeRelegation) {
+            team.positionSecured = true;
+            team.securedReason = 'Relegated';
+          }
+        }
+      });
+    }
   });
   
   return updatedGroups;
 }
 
-function isGroupStageComplete(groups: Group[]): boolean {
+function isGroupStageComplete(groups: EnhancedGroup[]): boolean {
   return groups.every(group => 
     group.teams.every(team => team.played >= 3) // Each team plays each other once (3 matches total)
   );
 }
 
-function getTeamStatusText(position: number): string {
-  switch (position) {
-    case 0: return 'Qualified';
-    case 1:
-    case 2: return 'Playoff';
-    case 3: return 'Relegated';
-    default: return '';
-  }
-}
-
-function GroupTable({ group }: { group: Group }) {
+function GroupTable({ group }: { group: EnhancedGroup }) {
   const groupComplete = group.teams.every(team => team.played >= 3); // Each team plays 3 matches
   
   return (
@@ -783,37 +918,69 @@ function GroupTable({ group }: { group: Group }) {
               <th className="text-center px-2 py-2 font-medium text-gray-600">F</th>
               <th className="text-center px-2 py-2 font-medium text-gray-600">A</th>
               <th className="text-center px-2 py-2 font-medium text-gray-600">Pts</th>
-              {groupComplete && <th className="text-center px-2 py-2 font-medium text-gray-600">Status</th>}
+              <th className="text-center px-2 py-2 font-medium text-gray-600">Status</th>
             </tr>
           </thead>
           <tbody>
             {group.teams.map((team, index) => {
               let statusClass = '';
               let statusIcon = '';
+              let statusText = '';
+              let borderClass = '';
               
-              // Always show color coding since matches have been played
+              // Determine status and styling based on position and whether it's secured
               if (index === 0) {
-                statusClass = 'bg-green-50 border-l-4 border-l-green-500';
                 statusIcon = '✓';
+                statusText = 'Qualified';
+                if (team.positionSecured) {
+                  statusClass = 'bg-green-100 text-green-800 font-bold';
+                  borderClass = 'border-l-4 border-l-green-600 bg-green-50';
+                } else {
+                  statusClass = 'bg-green-50 text-green-700';
+                  borderClass = 'border-l-4 border-l-green-400 bg-green-25';
+                }
               } else if (index === 1 || index === 2) {
-                statusClass = 'bg-yellow-50 border-l-4 border-l-yellow-500';
                 statusIcon = '○';
+                statusText = 'Playoff';
+                if (team.positionSecured) {
+                  statusClass = 'bg-yellow-100 text-yellow-800 font-bold';
+                  borderClass = 'border-l-4 border-l-yellow-600 bg-yellow-50';
+                } else {
+                  statusClass = 'bg-yellow-50 text-yellow-700';
+                  borderClass = 'border-l-4 border-l-yellow-400 bg-yellow-25';
+                }
               } else {
-                statusClass = 'bg-red-50 border-l-4 border-l-red-500';
                 statusIcon = '✗';
+                statusText = 'Relegated';
+                if (team.positionSecured) {
+                  statusClass = 'bg-red-100 text-red-800 font-bold';
+                  borderClass = 'border-l-4 border-l-red-600 bg-red-50';
+                } else {
+                  statusClass = 'bg-red-50 text-red-700';
+                  borderClass = 'border-l-4 border-l-red-400 bg-red-25';
+                }
               }
               
               return (
-                <tr key={team.name} className={`${statusClass} hover:bg-gray-50`}>
+                <tr key={team.name} className={`${borderClass} hover:bg-gray-50 transition-colors`}>
                   <td className="px-3 py-2">
                     <div className="flex items-center">
-                      <span className="mr-2 text-xs">{statusIcon}</span>
+                      <span className={`mr-2 text-xs font-bold ${team.positionSecured ? 'text-gray-800' : 'text-gray-500'}`}>
+                        {statusIcon}
+                      </span>
                       <img 
                         src={getTeamLogo(team.name)} 
                         alt={`${team.name} logo`}
                         className="w-5 h-5 mr-2 flex-shrink-0"
                       />
-                      <span className="font-medium text-gray-900">{team.name}</span>
+                      <span className={`font-medium ${team.positionSecured ? 'text-gray-900 font-bold' : 'text-gray-900'}`}>
+                        {team.name}
+                      </span>
+                      {team.positionSecured && (
+                        <span className="ml-2 text-xs text-gray-500 italic">
+                          ({team.securedReason})
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="text-center px-2 py-2 text-gray-700">{team.played}</td>
@@ -822,18 +989,19 @@ function GroupTable({ group }: { group: Group }) {
                   <td className="text-center px-2 py-2 text-gray-700">{team.lost}</td>
                   <td className="text-center px-2 py-2 text-gray-700">{team.for}</td>
                   <td className="text-center px-2 py-2 text-gray-700">{team.against}</td>
-                  <td className="text-center px-2 py-2 font-bold text-gray-900">{team.points}</td>
-                  {groupComplete && (
-                    <td className="text-center px-2 py-2 text-xs font-medium">
-                      <span className={`px-2 py-1 rounded ${
-                        index === 0 ? 'bg-green-100 text-green-700' :
-                        index === 1 || index === 2 ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-red-100 text-red-700'
-                      }`}>
-                        {getTeamStatusText(index)}
-                      </span>
-                    </td>
-                  )}
+                  <td className={`text-center px-2 py-2 font-bold ${team.positionSecured ? 'text-gray-900 text-lg' : 'text-gray-900'}`}>
+                    {team.points}
+                  </td>
+                  <td className="text-center px-2 py-2 text-xs font-medium">
+                    <span className={`px-2 py-1 rounded ${statusClass} ${team.positionSecured ? 'ring-2 ring-offset-1' : ''} ${
+                      index === 0 && team.positionSecured ? 'ring-green-400' :
+                      (index === 1 || index === 2) && team.positionSecured ? 'ring-yellow-400' :
+                      index === 3 && team.positionSecured ? 'ring-red-400' : ''
+                    }`}>
+                      {statusText}
+                      {team.positionSecured && ' ✓'}
+                    </span>
+                  </td>
                 </tr>
               );
             })}
@@ -841,25 +1009,31 @@ function GroupTable({ group }: { group: Group }) {
         </table>
       </div>
       
-      {/* Legend - Only show when group stage is complete */}
-      {groupComplete && (
-        <div className="bg-gray-50 border-t border-gray-200 px-4 py-3">
-          <div className="flex flex-wrap gap-4 text-xs text-gray-600">
-            <div className="flex items-center">
-              <span className="w-3 h-3 bg-green-500 rounded-full mr-2"></span>
-              <span>Qualified</span>
-            </div>
-            <div className="flex items-center">
-              <span className="w-3 h-3 bg-yellow-500 rounded-full mr-2"></span>
-              <span>Playoff</span>
-            </div>
-            <div className="flex items-center">
-              <span className="w-3 h-3 bg-red-500 rounded-full mr-2"></span>
-              <span>Relegated</span>
-            </div>
+      {/* Legend */}
+      <div className="bg-gray-50 border-t border-gray-200 px-4 py-3">
+        <div className="flex flex-wrap gap-4 text-xs text-gray-600 mb-2">
+          <div className="flex items-center">
+            <span className="w-3 h-3 bg-green-500 rounded-full mr-2"></span>
+            <span>Qualified</span>
+          </div>
+          <div className="flex items-center">
+            <span className="w-3 h-3 bg-yellow-500 rounded-full mr-2"></span>
+            <span>Playoff</span>
+          </div>
+          <div className="flex items-center">
+            <span className="w-3 h-3 bg-red-500 rounded-full mr-2"></span>
+            <span>Relegated</span>
           </div>
         </div>
-      )}
+        <div className="text-xs text-gray-500">
+          <span className="font-medium">Tiebreaking:</span> 1. Points, 2. Head-to-head result, 3. Goal difference, 4. Goals scored
+        </div>
+        {group.teams.some(t => t.positionSecured) && (
+          <div className="text-xs text-gray-500 mt-1">
+            <span className="font-medium">✓ = Position secured</span> based on completed matches and head-to-head results
+          </div>
+        )}
+      </div>
     </div>
   );
 }

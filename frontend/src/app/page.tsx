@@ -65,9 +65,10 @@ function filterSeniorChampionships(matches: Match[]) {
 
 // Helper function to parse date strings for sorting
 function parseMatchDate(match: Match): Date {
-  const { date, time } = match;
-  
   try {
+    if (!match.date) return new Date(); // fallback to current date
+    const { date, time } = match;
+    
     // Convert date like "Saturday 17 May" or "Sunday 01 June" to a proper date
     const dateMatch = date.match(/(\w+)\s+(\d{1,2})\s+(\w+)/);
     if (!dateMatch) return new Date(); // fallback to current date
@@ -1051,11 +1052,18 @@ export default function HomePage() {
   useEffect(() => {
     getMatches()
       .then((data) => {
+        if (!Array.isArray(data)) {
+          console.error('Received invalid data format:', data);
+          setErrorState('Received invalid data format');
+          setLoading(false);
+          return;
+        }
+
         console.log('Matches received:', data.length);
         
         // Get the most recent scrape time from the matches
         const latestScrapeTime = data.reduce((latest, match) => {
-          if (!match.scrapedAt) return latest;
+          if (!match?.scrapedAt) return latest;
           const scrapeTime = new Date(match.scrapedAt).getTime();
           return scrapeTime > latest ? scrapeTime : latest;
         }, 0);
@@ -1069,9 +1077,20 @@ export default function HomePage() {
           }));
         }
 
-        // Filter out matches without competition names
-        const validMatches = data.filter(match => match && match.competition);
-        
+        // Filter out invalid matches
+        const validMatches = data.filter(match => 
+          match && 
+          typeof match.competition === 'string' &&
+          typeof match.homeTeam === 'string' &&
+          typeof match.awayTeam === 'string' &&
+          typeof match.date === 'string' &&
+          typeof match.isFixture === 'boolean'
+        );
+
+        if (validMatches.length < data.length) {
+          console.warn(`Filtered out ${data.length - validMatches.length} invalid matches`);
+        }
+
         // Rest of your existing code...
         const seniorChampionships = validMatches
           .map(match => match.competition)

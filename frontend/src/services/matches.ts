@@ -2,6 +2,18 @@ import { Match } from '@/types/matches';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+// Validate match data to ensure all required fields are present
+function validateMatch(match: any): match is Match {
+  return (
+    match &&
+    typeof match.competition === 'string' &&
+    typeof match.homeTeam === 'string' &&
+    typeof match.awayTeam === 'string' &&
+    typeof match.date === 'string' &&
+    typeof match.isFixture === 'boolean'
+  );
+}
+
 export async function getMatches(isFixture?: boolean): Promise<Match[]> {
   try {
     const url = isFixture !== undefined 
@@ -14,8 +26,17 @@ export async function getMatches(isFixture?: boolean): Promise<Match[]> {
     }
     
     const data = await response.json();
-    // Handle new API response format
-    return data.matches || data;
+    // Handle new API response format and validate matches
+    const matches = (data.matches || data) as any[];
+    
+    // Filter out invalid matches
+    const validMatches = matches.filter(validateMatch);
+    
+    if (validMatches.length < matches.length) {
+      console.warn(`Filtered out ${matches.length - validMatches.length} invalid matches`);
+    }
+    
+    return validMatches;
   } catch (error) {
     console.error('Error fetching matches:', error);
     return [];

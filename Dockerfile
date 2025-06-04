@@ -24,16 +24,15 @@ RUN apt-get update && apt-get install -y \
     libasound2 \
     && rm -rf /var/lib/apt/lists/*
 
+# Set up working directory
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install
-
-# Install Playwright browser
-RUN npx playwright install chromium
+# Install dependencies and Playwright browser
+RUN npm install && \
+    npx playwright install chromium --with-deps
 
 # Copy source code
 COPY . .

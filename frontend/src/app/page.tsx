@@ -1050,8 +1050,15 @@ export default function HomePage() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
   useEffect(() => {
-    getMatches()
-      .then((data) => {
+    let mounted = true;
+
+    const fetchData = async () => {
+      try {
+        const data = await getMatches();
+        
+        // If component is unmounted, don't update state
+        if (!mounted) return;
+
         if (!Array.isArray(data)) {
           console.error('Received invalid data format:', data);
           setErrorState('Received invalid data format');
@@ -1059,25 +1066,7 @@ export default function HomePage() {
           return;
         }
 
-        console.log('Matches received:', data.length);
-        
-        // Get the most recent scrape time from the matches
-        const latestScrapeTime = data.reduce((latest, match) => {
-          if (!match?.scrapedAt) return latest;
-          const scrapeTime = new Date(match.scrapedAt).getTime();
-          return scrapeTime > latest ? scrapeTime : latest;
-        }, 0);
-        
-        if (latestScrapeTime) {
-          const date = new Date(latestScrapeTime);
-          // Format the date in Irish locale
-          setLastUpdated(date.toLocaleString('en-IE', {
-            dateStyle: 'short',
-            timeStyle: 'short'
-          }));
-        }
-
-        // Filter out invalid matches
+        // Filter out invalid matches first
         const validMatches = data.filter(match => 
           match && 
           typeof match.competition === 'string' &&
@@ -1091,51 +1080,106 @@ export default function HomePage() {
           console.warn(`Filtered out ${data.length - validMatches.length} invalid matches`);
         }
 
-        // Rest of your existing code...
+        if (validMatches.length === 0) {
+          setErrorState('No valid matches found');
+          setLoading(false);
+          return;
+        }
+
+        // Get the most recent scrape time from the matches
+        const latestScrapeTime = validMatches.reduce((latest, match) => {
+          if (!match?.scrapedAt) return latest;
+          const scrapeTime = new Date(match.scrapedAt).getTime();
+          return scrapeTime > latest ? scrapeTime : latest;
+        }, 0);
+        
+        if (latestScrapeTime) {
+          const date = new Date(latestScrapeTime);
+          setLastUpdated(date.toLocaleString('en-IE', {
+            dateStyle: 'short',
+            timeStyle: 'short'
+          }));
+        }
+
+        // Process senior championships only if we have valid matches
         const seniorChampionships = validMatches
           .map(match => match.competition)
-          .filter(comp => comp && comp.toLowerCase().includes('senior championship'))
+          .filter(Boolean) // Extra safety check
+          .filter(comp => comp.toLowerCase().includes('senior championship'))
           .filter((comp, index, self) => self.indexOf(comp) === index)
           .sort();
 
-        console.log('Senior championship competitions found:', seniorChampionships);
-        
-        // Debug: Count senior championship matches
-        const seniorChampionshipMatches = data.filter(match => 
-          match.competition.toLowerCase().includes('senior championship')
-        );
-        console.log('Senior championship matches found:', seniorChampionshipMatches.length);
-        
-        // Debug: Show actual senior championship competition names
-        const seniorChampionshipNames = [...new Set(seniorChampionshipMatches.map(match => match.competition))];
-        console.log('Actual senior championship competition names:', seniorChampionshipNames);
-        
-        // Debug: Log hurling vs football breakdown for senior championships
-        const hurlingCompetitions = seniorChampionships.filter(comp => 
-          comp.toLowerCase().includes('hurling') || 
-          comp.toLowerCase().includes('camán') || 
-          comp.toLowerCase().includes('iomaint') ||
-          comp.toLowerCase().includes('camogie')
-        );
-        const footballCompetitions = seniorChampionships.filter(comp => 
-          comp.toLowerCase().includes('football') || 
-          comp.toLowerCase().includes('peil') ||
-          comp.toLowerCase().includes('ladies football') ||
-          comp.toLowerCase().includes('gaelic football')
-        );
-        
-        console.log('Senior hurling championships found:', hurlingCompetitions);
-        console.log('Senior football championships found:', footballCompetitions);
-        
-        setMatches(data);
+        setMatches(validMatches);
         setLoading(false);
-      })
-      .catch((err) => {
-        console.error('Error fetching matches:', err);
-        setErrorState(err.message || 'Failed to fetch matches');
+      } catch (err) {
+        console.error('Error in data fetching:', err);
+        setErrorState(err instanceof Error ? err.message : 'Failed to fetch matches');
         setLoading(false);
-      });
+      }
+    };
+
+    fetchData();
+
+    // Cleanup function
+    return () => {
+      mounted = false;
+    };
   }, []);
+
+  // Only process matches if we have data and no error
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white">
+        <header className="bg-white border-b border-gray-200">
+          <div className="max-w-6xl mx-auto px-4">
+            <div className="flex items-center justify-between h-16">
+              <h1 className="text-2xl font-bold text-gray-900">
+                GAA<span className="text-green-600">Score</span>
+              </h1>
+              <div className="text-sm text-gray-600">Loading...</div>
+            </div>
+          </div>
+        </header>
+        <main className="max-w-6xl mx-auto px-4 py-6">
+          <div className="flex items-center justify-center py-20">
+            <div className="w-8 h-8 border-2 border-green-600 border-t-transparent rounded-full animate-spin"></div>
+            <span className="ml-3 text-gray-600">Loading matches...</span>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (errorState) {
+    return (
+      <div className="min-h-screen bg-white">
+        <header className="bg-white border-b border-gray-200">
+          <div className="max-w-6xl mx-auto px-4">
+            <div className="flex items-center justify-between h-16">
+              <h1 className="text-2xl font-bold text-gray-900">
+                GAA<span className="text-green-600">Score</span>
+              </h1>
+              <div className="text-sm text-gray-600">Error</div>
+            </div>
+          </div>
+        </header>
+        <main className="max-w-6xl mx-auto px-4 py-6">
+          <div className="text-center py-20">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md mx-auto">
+              <h3 className="text-lg font-semibold text-red-800 mb-2">Error Loading Matches</h3>
+              <p className="text-red-600 mb-4">{errorState}</p>
+              <button 
+                onClick={() => window.location.reload()} 
+                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded transition-colors"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   // Get latest senior championship results with intelligent fallback
   const { results: latestResults, weekLabel } = getLatestResults(matches, activeSport);

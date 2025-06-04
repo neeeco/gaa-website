@@ -138,7 +138,7 @@ function groupSeniorChampionships(matches: Match[]) {
   };
 
   matches.forEach((match) => {
-    if (!match.competition) return;
+    if (!match?.competition) return;
     const compLower = match.competition.toLowerCase();
     let sport: 'hurling' | 'football';
     
@@ -328,12 +328,14 @@ function filterPreviousWeekResults(matches: Match[]): Match[] {
 function getLatestResults(matches: Match[], sport: 'football' | 'hurling'): { results: Match[]; weekLabel: string } {
   // Filter to only senior championships first
   const seniorMatches = matches.filter((match) => {
+    if (!match?.competition) return false;
     const compLower = match.competition.toLowerCase();
     return compLower.includes('senior championship');
   });
   
   // Then filter by sport
   const sportMatches = seniorMatches.filter(match => {
+    if (!match?.competition) return false;
     const compLower = match.competition.toLowerCase();
     if (sport === 'hurling') {
       return compLower.includes('hurling') || 

@@ -167,6 +167,10 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
       timeout: 30000
     });
     
+    // Take a screenshot right after page load
+    await page.screenshot({ path: 'debug-initial-load.png' });
+    console.log('Initial page load screenshot saved');
+    
     // Handle cookie consent popup if it appears
     console.log('Checking for cookie consent popup...');
     try {
@@ -421,6 +425,9 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
         const currentMatches = await page.evaluate(() => {
           const matches: any[] = [];
           document.querySelectorAll('.gar-match-item').forEach(match => {
+            // Debug: Log the entire match HTML
+            console.log('Raw match HTML:', match.outerHTML);
+            
             const competition = match.closest('.gar-matches-list__group')?.querySelector('.gar-matches-list__group-name')?.textContent?.trim() || '';
             const date = match.closest('.gar-matches-list__day')?.querySelector('.gar-matches-list__date')?.textContent?.trim() || '';
             
@@ -428,9 +435,19 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
             let homeTeam = '';
             let awayTeam = '';
             
+            // Debug: Log all potential team name elements
+            console.log('Potential team elements:', {
+              originalHome: match.querySelector('.gar-match-item__team.-home .gar-match-item__team-name')?.outerHTML,
+              originalAway: match.querySelector('.gar-match-item__team.-away .gar-match-item__team-name')?.outerHTML,
+              allTeamElements: Array.from(match.querySelectorAll('.gar-match-item__team-name, .team-name, .match-team-name')).map(el => el.outerHTML),
+              fullText: match.textContent
+            });
+            
             // First try the original selectors
             homeTeam = match.querySelector('.gar-match-item__team.-home .gar-match-item__team-name')?.textContent?.trim() || '';
             awayTeam = match.querySelector('.gar-match-item__team.-away .gar-match-item__team-name')?.textContent?.trim() || '';
+            
+            console.log('Original selectors result:', { homeTeam, awayTeam });
             
             // If not found, try alternative selectors
             if (!homeTeam || !awayTeam) {
@@ -438,23 +455,113 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
               if (teams.length >= 2) {
                 homeTeam = teams[0].textContent?.trim() || '';
                 awayTeam = teams[1].textContent?.trim() || '';
+                console.log('Alternative selectors result:', { homeTeam, awayTeam });
               }
             }
             
             // If still not found, try looking for any elements containing team names
             if (!homeTeam || !awayTeam) {
               const matchText = match.textContent || '';
-              const possibleTeams = matchText.split('vs').map(t => t.trim());
-              if (possibleTeams.length >= 2) {
-                // Clean up the team names
-                homeTeam = possibleTeams[0].replace(/\d+[-–]\d+|\(\d+[-–]\d+\)|\s+\d+[-–]\d+\s+/g, '').trim();
-                awayTeam = possibleTeams[1].replace(/\d+[-–]\d+|\(\d+[-–]\d+\)|\s+\d+[-–]\d+\s+/g, '').trim();
+              console.log('Full match text:', matchText);
+              
+              // Try to find team names using 'v' or 'vs' as separator
+              const vsPatterns = ['vs', ' v '];
+              for (const pattern of vsPatterns) {
+                if (matchText.includes(pattern)) {
+                  const possibleTeams = matchText.split(pattern).map(t => t.trim());
+                  if (possibleTeams.length >= 2) {
+                    // Clean up the team names
+                    homeTeam = possibleTeams[0].replace(/\d+[-–]\d+|\(\d+[-–]\d+\)|\s+\d+[-–]\d+\s+/g, '').trim();
+                    awayTeam = possibleTeams[1].replace(/\d+[-–]\d+|\(\d+[-–]\d+\)|\s+\d+[-–]\d+\s+/g, '').trim();
+                    console.log(`Found teams using "${pattern}" separator:`, { homeTeam, awayTeam });
+                    break;
+                  }
+                }
+              }
+            }
+            
+            // If still not found, try additional selectors and patterns
+            if (!homeTeam || !awayTeam) {
+              // Try finding elements with team-related classes
+              const teamElements = Array.from(match.querySelectorAll('[class*="team"], [class*="club"], [class*="county"]'));
+              console.log('Found team-related elements:', teamElements.map(el => ({
+                html: el.outerHTML,
+                text: el.textContent?.trim()
+              })));
+
+              // Try finding elements that might contain team names based on common patterns
+              const allElements = Array.from(match.querySelectorAll('*'));
+              const potentialTeamElements = allElements.filter(el => {
+                const text = el.textContent?.trim() || '';
+                // Look for elements that might be team names (e.g., "Dublin", "Mayo", etc.)
+                return text.length > 0 && 
+                       text.length < 30 && // Team names are usually short
+                       !text.includes(':') && // Avoid labels
+                       !text.match(/^\d/) && // Avoid scores
+                       !text.match(/^(Venue|Referee|Time|Date)/i) && // Avoid metadata
+                       !text.includes('vs') && // Avoid full match text
+                       !text.includes(' v ');
+              });
+
+              console.log('Potential team elements found:', potentialTeamElements.map(el => ({
+                html: el.outerHTML,
+                text: el.textContent?.trim()
+              })));
+
+              // If we found exactly two potential team elements, use them
+              if (potentialTeamElements.length === 2) {
+                homeTeam = potentialTeamElements[0].textContent?.trim() || '';
+                awayTeam = potentialTeamElements[1].textContent?.trim() || '';
+                console.log('Found teams using element analysis:', { homeTeam, awayTeam });
+              }
+              // If we found more than two, try to identify the most likely team names
+              else if (potentialTeamElements.length > 2) {
+                const commonTeamNames = [
+                  'dublin', 'kerry', 'mayo', 'galway', 'tyrone', 'donegal', 'monaghan',
+                  'armagh', 'derry', 'cork', 'clare', 'limerick', 'waterford', 'tipperary',
+                  'kilkenny', 'wexford', 'offaly', 'laois', 'meath', 'westmeath', 'louth',
+                  'longford', 'carlow', 'wicklow', 'kildare', 'cavan', 'fermanagh', 'antrim',
+                  'down', 'sligo', 'roscommon', 'leitrim'
+                ];
+                
+                const likelyTeams = potentialTeamElements
+                  .map(el => ({
+                    element: el,
+                    text: el.textContent?.trim() || '',
+                    score: 0
+                  }))
+                  .map(item => {
+                    // Score based on common team names
+                    if (commonTeamNames.some(name => 
+                      item.text.toLowerCase().includes(name)
+                    )) {
+                      item.score += 2;
+                    }
+                    // Score based on element properties
+                    if (item.element.className.toLowerCase().includes('team')) {
+                      item.score += 1;
+                    }
+                    return item;
+                  })
+                  .sort((a, b) => b.score - a.score)
+                  .slice(0, 2);
+
+                if (likelyTeams.length === 2) {
+                  homeTeam = likelyTeams[0].text;
+                  awayTeam = likelyTeams[1].text;
+                  console.log('Found teams using likelihood analysis:', { homeTeam, awayTeam });
+                }
               }
             }
             
             // Skip this match if we couldn't find valid team names
             if (!homeTeam || !awayTeam) {
-              console.warn('Could not find team names for match:', match.textContent?.trim());
+              console.warn('Could not find team names for match:', {
+                matchHTML: match.outerHTML,
+                matchText: match.textContent?.trim(),
+                competition,
+                date
+              });
               return;
             }
             

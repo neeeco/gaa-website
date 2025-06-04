@@ -1,18 +1,17 @@
 export interface Match {
-  id?: number;
   competition: string;
   homeTeam: string;
   awayTeam: string;
+  date: string;
   homeScore?: string;
   awayScore?: string;
   venue?: string;
   referee?: string;
-  date: string;
   time?: string;
   broadcasting?: string;
-  isFixture: boolean;
   scrapedAt?: string;
   createdAt?: string;
+  isFixture: boolean;
 }
 
 export function isValidString(value: unknown): value is string {
@@ -20,7 +19,7 @@ export function isValidString(value: unknown): value is string {
 }
 
 export function isValidOptionalString(value: unknown): value is string | undefined {
-  return value === undefined || (typeof value === 'string' && value !== null);
+  return value === undefined || (typeof value === 'string' && value.length > 0);
 }
 
 export function isValidMatch(match: unknown): match is Match {

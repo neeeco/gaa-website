@@ -2,48 +2,6 @@ import { Match } from '@/types/matches';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-// Enhanced validation to ensure all required fields are present and properly typed
-function validateMatch(match: unknown): match is Match {
-  try {
-    if (!match || typeof match !== 'object') return false;
-
-    const m = match as Partial<Match>;
-
-    // Required fields must be present and of correct type
-    const hasRequiredFields = 
-      typeof m.competition === 'string' && m.competition.length > 0 &&
-      typeof m.homeTeam === 'string' && m.homeTeam.length > 0 &&
-      typeof m.awayTeam === 'string' && m.awayTeam.length > 0 &&
-      typeof m.date === 'string' && m.date.length > 0 &&
-      typeof m.isFixture === 'boolean';
-
-    if (!hasRequiredFields) return false;
-
-    // Optional fields must be of correct type if present
-    if (m.homeScore !== undefined && typeof m.homeScore !== 'string') return false;
-    if (m.awayScore !== undefined && typeof m.awayScore !== 'string') return false;
-    if (m.venue !== undefined && typeof m.venue !== 'string') return false;
-    if (m.referee !== undefined && typeof m.referee !== 'string') return false;
-    if (m.time !== undefined && typeof m.time !== 'string') return false;
-    if (m.broadcasting !== undefined && typeof m.broadcasting !== 'string') return false;
-    if (m.scrapedAt !== undefined && typeof m.scrapedAt !== 'string') return false;
-    if (m.createdAt !== undefined && typeof m.createdAt !== 'string') return false;
-
-    // Ensure no null values in string fields
-    const stringFields = ['competition', 'homeTeam', 'awayTeam', 'date', 'homeScore', 'awayScore', 
-                         'venue', 'referee', 'time', 'broadcasting', 'scrapedAt', 'createdAt'] as const;
-    
-    for (const field of stringFields) {
-      if (m[field] === null) m[field] = undefined;
-    }
-
-    return true;
-  } catch (error) {
-    console.warn('Error validating match:', error);
-    return false;
-  }
-}
-
 export async function getMatches(isFixture?: boolean): Promise<Match[]> {
   try {
     const url = isFixture !== undefined 
@@ -67,14 +25,13 @@ export async function getMatches(isFixture?: boolean): Promise<Match[]> {
     console.log('Raw API response:', data);
     
     // Handle new API response format
-    const rawMatches = (data.matches || data) as unknown[];
-    
-    if (!Array.isArray(rawMatches)) {
-      console.error('Received invalid matches format:', rawMatches);
-      throw new Error('Invalid data format received from server');
-    }
+    const rawMatches = Array.isArray(data) ? data : data.matches || [];
+    console.log('Raw matches array length:', rawMatches.length);
 
-    console.log('Processing', rawMatches.length, 'matches');
+    if (!Array.isArray(rawMatches)) {
+      console.error('Invalid matches data format:', rawMatches);
+      throw new Error('Invalid matches data format received');
+    }
 
     // Filter out invalid matches and normalize data
     const validMatches = rawMatches
@@ -83,49 +40,71 @@ export async function getMatches(isFixture?: boolean): Promise<Match[]> {
           console.warn('Found null/undefined match entry');
           return false;
         }
+        
+        // Basic structure validation
+        if (typeof match !== 'object') {
+          console.warn('Match is not an object:', match);
+          return false;
+        }
+        
+        // Required fields validation
+        const requiredFields = ['competition', 'homeTeam', 'awayTeam', 'date', 'isFixture'];
+        const missingFields = requiredFields.filter(field => !(field in match));
+        
+        if (missingFields.length > 0) {
+          console.warn(`Match missing required fields: ${missingFields.join(', ')}`, match);
+          return false;
+        }
+        
         return true;
       })
-      .map((match: Record<string, unknown>) => {
+      .map((match: Record<string, unknown>): Match | null => {
         try {
-          return {
-            ...match,
-            // Ensure string fields are never null
-            competition: typeof match.competition === 'string' ? match.competition : '',
-            homeTeam: typeof match.homeTeam === 'string' ? match.homeTeam : '',
-            awayTeam: typeof match.awayTeam === 'string' ? match.awayTeam : '',
-            date: typeof match.date === 'string' ? match.date : '',
-            homeScore: typeof match.homeScore === 'string' ? match.homeScore : undefined,
-            awayScore: typeof match.awayScore === 'string' ? match.awayScore : undefined,
-            venue: typeof match.venue === 'string' ? match.venue : undefined,
-            referee: typeof match.referee === 'string' ? match.referee : undefined,
-            time: typeof match.time === 'string' ? match.time : undefined,
-            broadcasting: typeof match.broadcasting === 'string' ? match.broadcasting : undefined,
-            scrapedAt: typeof match.scrapedAt === 'string' ? match.scrapedAt : undefined,
-            createdAt: typeof match.createdAt === 'string' ? match.createdAt : undefined,
+          // Normalize the match data
+          const normalizedMatch: Match = {
+            competition: String(match.competition || ''),
+            homeTeam: String(match.homeTeam || ''),
+            awayTeam: String(match.awayTeam || ''),
+            date: String(match.date || ''),
+            homeScore: match.homeScore ? String(match.homeScore) : undefined,
+            awayScore: match.awayScore ? String(match.awayScore) : undefined,
+            venue: match.venue ? String(match.venue) : undefined,
+            referee: match.referee ? String(match.referee) : undefined,
+            time: match.time ? String(match.time) : undefined,
+            broadcasting: match.broadcasting ? String(match.broadcasting) : undefined,
+            scrapedAt: match.scrapedAt ? String(match.scrapedAt) : new Date().toISOString(),
             isFixture: Boolean(match.isFixture)
           };
+
+          // Additional validation
+          if (!normalizedMatch.competition || !normalizedMatch.homeTeam || !normalizedMatch.awayTeam || !normalizedMatch.date) {
+            console.warn('Match has empty required fields:', normalizedMatch);
+            return null;
+          }
+
+          return normalizedMatch;
         } catch (error) {
           console.warn('Error processing match:', error, match);
           return null;
         }
       })
-      .filter((match): match is NonNullable<typeof match> => match !== null)
-      .filter(validateMatch);
+      .filter((match): match is Match => match !== null);
     
-    if (validMatches.length < rawMatches.length) {
-      console.warn(`Filtered out ${rawMatches.length - validMatches.length} invalid matches`);
-    }
-
+    console.log('Valid matches after filtering:', validMatches.length);
+    
     if (validMatches.length === 0) {
       console.error('No valid matches found after processing');
       throw new Error('No valid matches found in the data');
     }
-    
-    console.log('Returning', validMatches.length, 'valid matches');
+
+    if (validMatches.length < rawMatches.length) {
+      console.warn(`Filtered out ${rawMatches.length - validMatches.length} invalid matches`);
+    }
+
     return validMatches;
-  } catch (error) {
-    console.error('Error fetching matches:', error);
-    throw error; // Re-throw to let the component handle the error
+  } catch (err) {
+    console.error('Error in data fetching:', err);
+    throw err instanceof Error ? err : new Error('Failed to fetch matches');
   }
 }
 

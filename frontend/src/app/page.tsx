@@ -46,6 +46,7 @@ const allIrelandSFCGroups: Group[] = [
 
 function filterAllIrelandSFCMatches(matches: Match[]) {
   return matches.filter((match) => {
+    if (!match.competition) return false;
     const compLower = match.competition.toLowerCase();
     return compLower.includes('all-ireland') && 
            compLower.includes('senior') && 
@@ -56,6 +57,7 @@ function filterAllIrelandSFCMatches(matches: Match[]) {
 
 function filterSeniorChampionships(matches: Match[]) {
   return matches.filter((match) => {
+    if (!match.competition) return false;
     const compLower = match.competition.toLowerCase();
     return compLower.includes('senior championship');
   });
@@ -135,6 +137,7 @@ function groupSeniorChampionships(matches: Match[]) {
   };
 
   matches.forEach((match) => {
+    if (!match.competition) return;
     const compLower = match.competition.toLowerCase();
     let sport: 'hurling' | 'football';
     
@@ -1066,10 +1069,13 @@ export default function HomePage() {
           }));
         }
 
+        // Filter out matches without competition names
+        const validMatches = data.filter(match => match && match.competition);
+        
         // Rest of your existing code...
-        const seniorChampionships = data
+        const seniorChampionships = validMatches
           .map(match => match.competition)
-          .filter(comp => comp.toLowerCase().includes('senior championship'))
+          .filter(comp => comp && comp.toLowerCase().includes('senior championship'))
           .filter((comp, index, self) => self.indexOf(comp) === index)
           .sort();
 

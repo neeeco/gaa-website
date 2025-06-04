@@ -12,7 +12,8 @@
     "dev": "ts-node src/server.ts",
     "build": "npx tsc",
     "test": "jest",
-    "backup": "ts-node src/backup-data.ts"
+    "backup": "ts-node src/backup-data.ts",
+    "postinstall": "npx playwright install chromium"
   },
   "dependencies": {
     "@types/pg": "^8.15.4",

@@ -1043,11 +1043,23 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [errorState, setErrorState] = useState<string | null>(null);
   const [activeSport, setActiveSport] = useState<'football' | 'hurling'>('football');
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
   useEffect(() => {
     getMatches()
       .then((data) => {
         console.log('Matches received:', data.length);
+        if (data.length > 0) {
+          // Find the most recent scrape time
+          const latestScrape = data.reduce((latest, match) => {
+            const scrapeTime = new Date(match.scrapedAt || '').getTime();
+            return scrapeTime > latest ? scrapeTime : latest;
+          }, 0);
+          setLastUpdated(new Date(latestScrape).toLocaleString('en-IE', {
+            dateStyle: 'medium',
+            timeStyle: 'short'
+          }));
+        }
         console.log('Sample match:', data[0]);
         
         // Debug: Log competition names to understand what we have
@@ -1130,7 +1142,7 @@ export default function HomePage() {
               GAA<span className="text-green-600">Score</span>
             </h1>
             <div className="text-sm text-gray-600">
-              Latest Results & Upcoming Fixtures
+              {lastUpdated ? `Last Updated: ${lastUpdated}` : 'Loading...'}
             </div>
           </div>
 

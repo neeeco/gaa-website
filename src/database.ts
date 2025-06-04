@@ -84,6 +84,30 @@ class MatchDatabase {
 
       for (const match of matches) {
         try {
+          // Validate required fields
+          if (!match.competition?.trim() || !match.homeTeam?.trim() || !match.awayTeam?.trim() || !match.date?.trim()) {
+            console.warn('Skipping match with empty required fields:', match);
+            errors++;
+            continue;
+          }
+
+          // Clean and validate data
+          const cleanMatch = {
+            ...match,
+            competition: match.competition.trim(),
+            homeTeam: match.homeTeam.trim(),
+            awayTeam: match.awayTeam.trim(),
+            date: match.date.trim(),
+            homeScore: match.homeScore?.trim() || null,
+            awayScore: match.awayScore?.trim() || null,
+            venue: match.venue?.trim() || null,
+            referee: match.referee?.trim() || null,
+            time: match.time?.trim() || null,
+            broadcasting: match.broadcasting?.trim() || null,
+            isFixture: Boolean(match.isFixture),
+            scrapedAt: match.scrapedAt || new Date().toISOString()
+          };
+
           const result = await client.query(
             `
             INSERT INTO matches (
@@ -104,18 +128,18 @@ class MatchDatabase {
             RETURNING (xmax = 0) as inserted
             `,
             [
-              match.competition,
-              match.homeTeam,
-              match.awayTeam,
-              match.homeScore || null,
-              match.awayScore || null,
-              match.venue || null,
-              match.referee || null,
-              match.date,
-              match.time || null,
-              match.broadcasting || null,
-              match.isFixture,
-              match.scrapedAt
+              cleanMatch.competition,
+              cleanMatch.homeTeam,
+              cleanMatch.awayTeam,
+              cleanMatch.homeScore,
+              cleanMatch.awayScore,
+              cleanMatch.venue,
+              cleanMatch.referee,
+              cleanMatch.date,
+              cleanMatch.time,
+              cleanMatch.broadcasting,
+              cleanMatch.isFixture,
+              cleanMatch.scrapedAt
             ]
           );
 

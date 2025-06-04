@@ -424,45 +424,92 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
             const competition = match.closest('.gar-matches-list__group')?.querySelector('.gar-matches-list__group-name')?.textContent?.trim() || '';
             const date = match.closest('.gar-matches-list__day')?.querySelector('.gar-matches-list__date')?.textContent?.trim() || '';
             
-            const homeTeam = match.querySelector('.gar-match-item__team.-home .gar-match-item__team-name')?.textContent?.trim() || '';
-            const awayTeam = match.querySelector('.gar-match-item__team.-away .gar-match-item__team-name')?.textContent?.trim() || '';
+            // Try multiple possible selectors for team names
+            let homeTeam = '';
+            let awayTeam = '';
+            
+            // First try the original selectors
+            homeTeam = match.querySelector('.gar-match-item__team.-home .gar-match-item__team-name')?.textContent?.trim() || '';
+            awayTeam = match.querySelector('.gar-match-item__team.-away .gar-match-item__team-name')?.textContent?.trim() || '';
+            
+            // If not found, try alternative selectors
+            if (!homeTeam || !awayTeam) {
+              const teams = match.querySelectorAll('.gar-match-item__team-name, .team-name, .match-team-name');
+              if (teams.length >= 2) {
+                homeTeam = teams[0].textContent?.trim() || '';
+                awayTeam = teams[1].textContent?.trim() || '';
+              }
+            }
+            
+            // If still not found, try looking for any elements containing team names
+            if (!homeTeam || !awayTeam) {
+              const matchText = match.textContent || '';
+              const possibleTeams = matchText.split('vs').map(t => t.trim());
+              if (possibleTeams.length >= 2) {
+                // Clean up the team names
+                homeTeam = possibleTeams[0].replace(/\d+[-–]\d+|\(\d+[-–]\d+\)|\s+\d+[-–]\d+\s+/g, '').trim();
+                awayTeam = possibleTeams[1].replace(/\d+[-–]\d+|\(\d+[-–]\d+\)|\s+\d+[-–]\d+\s+/g, '').trim();
+              }
+            }
+            
+            // Skip this match if we couldn't find valid team names
+            if (!homeTeam || !awayTeam) {
+              console.warn('Could not find team names for match:', match.textContent?.trim());
+              return;
+            }
             
             let homeScore = null;
             let awayScore = null;
             
-            const homeScoreElement = match.querySelector('.gar-match-item__score.-home');
-            const awayScoreElement = match.querySelector('.gar-match-item__score.-away');
+            // Try multiple possible score selectors
+            const homeScoreElement = match.querySelector('.gar-match-item__score.-home, .home-score, .match-score-home');
+            const awayScoreElement = match.querySelector('.gar-match-item__score.-away, .away-score, .match-score-away');
             
             if (homeScoreElement && awayScoreElement) {
               homeScore = homeScoreElement.textContent?.replace(/<!--.*?-->/g, '').trim();
               awayScore = awayScoreElement.textContent?.replace(/<!--.*?-->/g, '').trim();
             }
             
-            const time = match.querySelector('.gar-match-item__upcoming')?.textContent?.trim() || 
+            // If no explicit score elements, try to extract scores from team elements
+            if (!homeScore || !awayScore) {
+              const scoreRegex = /(\d+[-–]\d+)/;
+              const homeScoreMatch = match.querySelector('.gar-match-item__team.-home, .home-team')?.textContent?.match(scoreRegex);
+              const awayScoreMatch = match.querySelector('.gar-match-item__team.-away, .away-team')?.textContent?.match(scoreRegex);
+              
+              if (homeScoreMatch) homeScore = homeScoreMatch[1];
+              if (awayScoreMatch) awayScore = awayScoreMatch[1];
+            }
+            
+            const time = match.querySelector('.gar-match-item__upcoming, .match-time, .fixture-time')?.textContent?.trim() || 
                         match.querySelector('.gar-match-item__time')?.textContent?.trim() || '';
                         
-            const venue = match.querySelector('.gar-match-item__venue')?.textContent?.trim()?.replace('Venue: ', '') || '';
-            const referee = match.querySelector('.gar-match-item__referee')?.textContent?.trim()?.replace('Referee: ', '') || '';
+            const venue = match.querySelector('.gar-match-item__venue, .match-venue, .fixture-venue')?.textContent?.trim()?.replace(/^Venue:\s*/i, '') || '';
+            const referee = match.querySelector('.gar-match-item__referee, .match-referee, .fixture-referee')?.textContent?.trim()?.replace(/^Referee:\s*/i, '') || '';
             
             // Check for broadcasting information
-            const broadcasting = match.querySelector('.gar-match-item__broadcasting')?.textContent?.trim() || '';
+            const broadcasting = match.querySelector('.gar-match-item__broadcasting, .match-broadcast, .fixture-broadcast')?.textContent?.trim() || '';
             
             const isFixture = !homeScore && !awayScore;
             
-            matches.push({
-              competition,
-              date,
-              homeTeam,
-              awayTeam,
-              homeScore,
-              awayScore,
-              venue,
-              referee,
-              time,
-              broadcasting,
-              isFixture,
-              scrapedAt: new Date().toISOString()
-            });
+            // Only add the match if we have all required fields
+            if (competition && homeTeam && awayTeam && date) {
+              matches.push({
+                competition,
+                date,
+                homeTeam,
+                awayTeam,
+                homeScore,
+                awayScore,
+                venue,
+                referee,
+                time,
+                broadcasting,
+                isFixture,
+                scrapedAt: new Date().toISOString()
+              });
+            } else {
+              console.warn('Skipping match due to missing required fields:', { competition, homeTeam, awayTeam, date });
+            }
           });
           
           return matches;

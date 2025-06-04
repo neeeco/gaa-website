@@ -431,26 +431,32 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
             const competition = match.closest('.gar-matches-list__group')?.querySelector('.gar-matches-list__group-name')?.textContent?.trim() || '';
             const date = match.closest('.gar-matches-list__day')?.querySelector('.gar-matches-list__date')?.textContent?.trim() || '';
             
-            // Extract team names using the specific class
+            // Extract team names using gar-match-item
             let homeTeam = '';
             let awayTeam = '';
             
             console.log('Attempting to extract team names for match:', { competition, date });
             
-            // Get all team name elements
-            const teamNameElements = match.querySelectorAll('.gar-match-item__team-name');
-            console.log('Found team name elements:', Array.from(teamNameElements).map(el => ({
+            // Get all match items and log their HTML for debugging
+            const matchItems = match.querySelectorAll('.gar-match-item');
+            console.log('Found match items:', Array.from(matchItems).map(el => ({
                 html: el.outerHTML,
                 text: el.textContent?.trim()
             })));
             
-            // Extract team names from the elements
-            if (teamNameElements.length >= 2) {
-                homeTeam = teamNameElements[0].textContent?.trim() || '';
-                awayTeam = teamNameElements[1].textContent?.trim() || '';
-                console.log('Found teams:', { homeTeam, awayTeam });
+            // Extract team names from the first match item
+            if (matchItems.length > 0) {
+                const matchItem = matchItems[0];
+                const teams = matchItem.textContent?.trim().split(/\s+v\s+|\s+vs\s+/i);
+                if (teams && teams.length >= 2) {
+                    homeTeam = teams[0].trim();
+                    awayTeam = teams[1].trim();
+                    console.log('Found teams from match item:', { homeTeam, awayTeam });
+                } else {
+                    console.warn('Could not split teams using v/vs in match item text');
+                }
             } else {
-                console.warn('Could not find both team names using .gar-match-item__team-name selector');
+                console.warn('Could not find .gar-match-item element');
             }
             
             // Clean team names

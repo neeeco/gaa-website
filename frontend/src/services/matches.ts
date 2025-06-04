@@ -22,11 +22,11 @@ export async function getMatches(isFixture?: boolean): Promise<Match[]> {
     }
     
     const data = await response.json();
-    console.log('Raw API response:', data);
+    console.log('Raw API response:', JSON.stringify(data, null, 2));
     
     // Handle new API response format
     const rawMatches = Array.isArray(data) ? data : data.matches || [];
-    console.log('Raw matches array length:', rawMatches.length);
+    console.log('Raw matches array:', JSON.stringify(rawMatches, null, 2));
 
     if (!Array.isArray(rawMatches)) {
       console.error('Invalid matches data format:', rawMatches);
@@ -47,50 +47,59 @@ export async function getMatches(isFixture?: boolean): Promise<Match[]> {
           return false;
         }
         
-        // Required fields validation
+        // Required fields validation with non-empty string check
         const requiredFields = ['competition', 'homeTeam', 'awayTeam', 'date', 'isFixture'];
-        const missingFields = requiredFields.filter(field => !(field in match));
+        const missingFields = requiredFields.filter(field => {
+          // Special case for isFixture which should be a boolean
+          if (field === 'isFixture') {
+            return typeof match[field] !== 'boolean';
+          }
+          // For string fields, check they exist and are non-empty strings
+          return !match[field] || typeof match[field] !== 'string' || !match[field].trim();
+        });
         
         if (missingFields.length > 0) {
-          console.warn(`Match missing required fields: ${missingFields.join(', ')}`, match);
+          console.warn(`Match missing or has empty required fields: ${missingFields.join(', ')}. Full match object:`, JSON.stringify(match, null, 2));
           return false;
         }
         
         return true;
       })
-      .map((match: Record<string, unknown>): Match | null => {
+      .map(match => {
         try {
-          // Normalize the match data
+          console.log('Processing match:', JSON.stringify(match, null, 2));
+          
+          // Normalize the match data - don't use OR with empty string for required fields
           const normalizedMatch: Match = {
-            competition: String(match.competition || ''),
-            homeTeam: String(match.homeTeam || ''),
-            awayTeam: String(match.awayTeam || ''),
-            date: String(match.date || ''),
-            homeScore: match.homeScore ? String(match.homeScore) : undefined,
-            awayScore: match.awayScore ? String(match.awayScore) : undefined,
-            venue: match.venue ? String(match.venue) : undefined,
-            referee: match.referee ? String(match.referee) : undefined,
-            time: match.time ? String(match.time) : undefined,
-            broadcasting: match.broadcasting ? String(match.broadcasting) : undefined,
+            competition: String(match.competition).trim(),
+            homeTeam: String(match.homeTeam).trim(),
+            awayTeam: String(match.awayTeam).trim(),
+            date: String(match.date).trim(),
+            homeScore: match.homeScore ? String(match.homeScore).trim() : undefined,
+            awayScore: match.awayScore ? String(match.awayScore).trim() : undefined,
+            venue: match.venue ? String(match.venue).trim() : undefined,
+            referee: match.referee ? String(match.referee).trim() : undefined,
+            time: match.time ? String(match.time).trim() : undefined,
+            broadcasting: match.broadcasting ? String(match.broadcasting).trim() : undefined,
             scrapedAt: match.scrapedAt ? String(match.scrapedAt) : new Date().toISOString(),
             isFixture: Boolean(match.isFixture)
           };
 
-          // Additional validation
-          if (!normalizedMatch.competition || !normalizedMatch.homeTeam || !normalizedMatch.awayTeam || !normalizedMatch.date) {
-            console.warn('Match has empty required fields:', normalizedMatch);
-            return null;
-          }
+          console.log('Normalized match:', JSON.stringify(normalizedMatch, null, 2));
 
+          // No need for additional validation since we've already validated required fields
           return normalizedMatch;
         } catch (error) {
-          console.warn('Error processing match:', error, match);
+          console.warn('Error processing match:', error, JSON.stringify(match, null, 2));
           return null;
         }
       })
       .filter((match): match is Match => match !== null);
     
     console.log('Valid matches after filtering:', validMatches.length);
+    if (validMatches.length > 0) {
+      console.log('First valid match example:', JSON.stringify(validMatches[0], null, 2));
+    }
     
     if (validMatches.length === 0) {
       console.error('No valid matches found after processing');

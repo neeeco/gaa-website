@@ -1101,14 +1101,6 @@ export default function HomePage() {
           }));
         }
 
-        // Process senior championships only if we have valid matches
-        const seniorChampionships = validMatches
-          .map(match => match.competition)
-          .filter(Boolean) // Extra safety check
-          .filter(comp => comp.toLowerCase().includes('senior championship'))
-          .filter((comp, index, self) => self.indexOf(comp) === index)
-          .sort();
-
         setMatches(validMatches);
         setLoading(false);
       } catch (err) {
@@ -1125,61 +1117,6 @@ export default function HomePage() {
       mounted = false;
     };
   }, []);
-
-  // Only process matches if we have data and no error
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white">
-        <header className="bg-white border-b border-gray-200">
-          <div className="max-w-6xl mx-auto px-4">
-            <div className="flex items-center justify-between h-16">
-              <h1 className="text-2xl font-bold text-gray-900">
-                GAA<span className="text-green-600">Score</span>
-              </h1>
-              <div className="text-sm text-gray-600">Loading...</div>
-            </div>
-          </div>
-        </header>
-        <main className="max-w-6xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-center py-20">
-            <div className="w-8 h-8 border-2 border-green-600 border-t-transparent rounded-full animate-spin"></div>
-            <span className="ml-3 text-gray-600">Loading matches...</span>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  if (errorState) {
-    return (
-      <div className="min-h-screen bg-white">
-        <header className="bg-white border-b border-gray-200">
-          <div className="max-w-6xl mx-auto px-4">
-            <div className="flex items-center justify-between h-16">
-              <h1 className="text-2xl font-bold text-gray-900">
-                GAA<span className="text-green-600">Score</span>
-              </h1>
-              <div className="text-sm text-gray-600">Error</div>
-            </div>
-          </div>
-        </header>
-        <main className="max-w-6xl mx-auto px-4 py-6">
-          <div className="text-center py-20">
-            <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md mx-auto">
-              <h3 className="text-lg font-semibold text-red-800 mb-2">Error Loading Matches</h3>
-              <p className="text-red-600 mb-4">{errorState}</p>
-              <button 
-                onClick={() => window.location.reload()} 
-                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded transition-colors"
-              >
-                Retry
-              </button>
-            </div>
-          </div>
-        </main>
-      </div>
-    );
-  }
 
   // Get latest senior championship results with intelligent fallback
   const { results: latestResults, weekLabel } = getLatestResults(matches, activeSport);
@@ -1321,22 +1258,19 @@ export default function HomePage() {
               )}
             </section>
 
-            {/* Upcoming Fixtures Section (within 2 weeks) */}
+            {/* Upcoming Fixtures Section */}
             <section>
               <div className="flex items-center mb-6">
                 <h2 className="text-xl font-bold text-gray-900">Upcoming Fixtures</h2>
                 <div className="ml-3 bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
                   {Object.values(currentUpcomingFixtures).flat().length} matches
                 </div>
-                <div className="ml-3 bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-xs font-medium">
-                  Next 2 weeks
-                </div>
               </div>
               
               {Object.keys(currentUpcomingFixtures).length === 0 ? (
                 <div className="text-center py-12 bg-gray-50 rounded-lg">
                   <div className="text-gray-400 text-lg mb-2">
-                    No upcoming fixtures in the next 2 weeks
+                    No upcoming fixtures
                   </div>
                   <p className="text-sm text-gray-500">
                     Check back later for updated match schedules
@@ -1355,16 +1289,13 @@ export default function HomePage() {
               )}
             </section>
 
-            {/* Future Fixtures Section (beyond 2 weeks) */}
+            {/* Future Fixtures Section */}
             {Object.keys(currentFutureFixtures).length > 0 && (
               <section>
                 <div className="flex items-center mb-6">
                   <h2 className="text-xl font-bold text-gray-900">Future Fixtures</h2>
                   <div className="ml-3 bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm font-medium">
                     {Object.values(currentFutureFixtures).flat().length} matches
-                  </div>
-                  <div className="ml-3 bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-xs font-medium">
-                    Beyond 2 weeks
                   </div>
                 </div>
                 

@@ -1168,9 +1168,16 @@ export default function HomePage() {
 
         console.log('Raw data received:', data);
 
+        if (!data) {
+          console.error('No data received');
+          setErrorState('No data received from the server');
+          setLoading(false);
+          return;
+        }
+
         if (!Array.isArray(data)) {
           console.error('Received invalid data format:', data);
-          setErrorState('Received invalid data format');
+          setErrorState('Received invalid data format from the server');
           setLoading(false);
           return;
         }
@@ -1184,26 +1191,34 @@ export default function HomePage() {
           
           console.log('Validating match:', match);
           
-          const isValid = match && 
-            typeof match.competition === 'string' &&
-            typeof match.homeTeam === 'string' &&
-            typeof match.awayTeam === 'string' &&
-            typeof match.date === 'string' &&
-            typeof match.isFixture === 'boolean';
+          try {
+            const isValid = match && 
+              typeof match.competition === 'string' &&
+              typeof match.homeTeam === 'string' &&
+              typeof match.awayTeam === 'string' &&
+              typeof match.date === 'string' &&
+              typeof match.isFixture === 'boolean';
+              
+            if (!isValid) {
+              console.warn('Invalid match structure:', match);
+            }
             
-          if (!isValid) {
-            console.warn('Invalid match found:', match);
+            return isValid;
+          } catch (error) {
+            console.warn('Error validating match:', error);
+            return false;
           }
-          
-          return isValid;
         });
+
+        console.log('Valid matches found:', validMatches.length);
 
         if (validMatches.length < data.length) {
           console.warn(`Filtered out ${data.length - validMatches.length} invalid matches`);
         }
 
         if (validMatches.length === 0) {
-          setErrorState('No valid matches found');
+          console.error('No valid matches found in the data');
+          setErrorState('No valid matches found in the data. Please try again later.');
           setLoading(false);
           return;
         }
@@ -1211,8 +1226,13 @@ export default function HomePage() {
         // Get the most recent scrape time from the matches
         const latestScrapeTime = validMatches.reduce((latest, match) => {
           if (!match?.scrapedAt) return latest;
-          const scrapeTime = new Date(match.scrapedAt).getTime();
-          return scrapeTime > latest ? scrapeTime : latest;
+          try {
+            const scrapeTime = new Date(match.scrapedAt).getTime();
+            return scrapeTime > latest ? scrapeTime : latest;
+          } catch (error) {
+            console.warn('Error parsing scrape time:', error);
+            return latest;
+          }
         }, 0);
         
         if (latestScrapeTime) {
@@ -1228,7 +1248,7 @@ export default function HomePage() {
         setLoading(false);
       } catch (err) {
         console.error('Error in data fetching:', err);
-        setErrorState(err instanceof Error ? err.message : 'Failed to fetch matches');
+        setErrorState(err instanceof Error ? err.message : 'Failed to fetch matches. Please try again later.');
         setLoading(false);
       }
     };

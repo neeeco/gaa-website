@@ -607,6 +607,7 @@ function getTeamLogo(teamName: string | undefined | null): string {
   }
 
   try {
+    console.log('hello');
     const normalizedName = String(teamName).toLowerCase().trim();
     
     // County information with colors and initials

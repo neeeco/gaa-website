@@ -1049,27 +1049,30 @@ export default function HomePage() {
     getMatches()
       .then((data) => {
         console.log('Matches received:', data.length);
-        if (data.length > 0) {
-          // Find the most recent scrape time
-          const latestScrape = data.reduce((latest, match) => {
-            const scrapeTime = new Date(match.scrapedAt || '').getTime();
-            return scrapeTime > latest ? scrapeTime : latest;
-          }, 0);
-          setLastUpdated(new Date(latestScrape).toLocaleString('en-IE', {
-            dateStyle: 'medium',
+        
+        // Get the most recent scrape time from the matches
+        const latestScrapeTime = data.reduce((latest, match) => {
+          if (!match.scrapedAt) return latest;
+          const scrapeTime = new Date(match.scrapedAt).getTime();
+          return scrapeTime > latest ? scrapeTime : latest;
+        }, 0);
+        
+        if (latestScrapeTime) {
+          const date = new Date(latestScrapeTime);
+          // Format the date in Irish locale
+          setLastUpdated(date.toLocaleString('en-IE', {
+            dateStyle: 'short',
             timeStyle: 'short'
           }));
         }
-        console.log('Sample match:', data[0]);
-        
-        // Debug: Log competition names to understand what we have
-        const competitions = [...new Set(data.map(match => match.competition))];
-        console.log('All competitions:', competitions);
-        
-        // Debug: Check senior championships specifically
-        const seniorChampionships = competitions.filter(comp => 
-          comp.toLowerCase().includes('senior championship')
-        );
+
+        // Rest of your existing code...
+        const seniorChampionships = data
+          .map(match => match.competition)
+          .filter(comp => comp.toLowerCase().includes('senior championship'))
+          .filter((comp, index, self) => self.indexOf(comp) === index)
+          .sort();
+
         console.log('Senior championship competitions found:', seniorChampionships);
         
         // Debug: Count senior championship matches

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { Match, GroupTeam, Group } from '../types/matches';
+import { Match, GroupTeam, Group, isValidMatch, isValidString } from '../types/matches';
 import { getMatches } from '@/services/matches';
 
 // Real All-Ireland SFC Group data based on 2025 structure
@@ -49,14 +49,14 @@ function filterAllIrelandSFCMatches(matches: Match[]): Match[] {
   
   return matches.filter((match) => {
     try {
-      if (!match?.competition) return false;
+      if (!isValidMatch(match)) return false;
       const compLower = String(match.competition).toLowerCase();
       return compLower.includes('all-ireland') && 
              compLower.includes('senior') && 
              compLower.includes('football') &&
              compLower.includes('championship');
-    } catch {
-      console.warn('Error filtering All-Ireland SFC match:', match);
+    } catch (error) {
+      console.warn('Error filtering All-Ireland SFC match:', error);
       return false;
     }
   });
@@ -67,11 +67,11 @@ function filterSeniorChampionships(matches: Match[]): Match[] {
   
   return matches.filter((match) => {
     try {
-      if (!match?.competition) return false;
+      if (!isValidMatch(match)) return false;
       const compLower = String(match.competition).toLowerCase();
       return compLower.includes('senior championship');
-    } catch {
-      console.warn('Error filtering senior championship match:', match);
+    } catch (error) {
+      console.warn('Error filtering senior championship match:', error);
       return false;
     }
   });
@@ -379,8 +379,8 @@ function getLatestResults(matches: Match[] | undefined | null, sport: 'football'
     // Filter to only senior championships first
     const seniorMatches = matches.filter((match) => {
       try {
-        if (!match?.competition) return false;
-        const compLower = match.competition.toLowerCase();
+        if (!isValidMatch(match)) return false;
+        const compLower = String(match.competition).toLowerCase();
         return compLower.includes('senior championship');
       } catch (error) {
         console.warn('Error filtering senior match:', error);
@@ -391,8 +391,8 @@ function getLatestResults(matches: Match[] | undefined | null, sport: 'football'
     // Then filter by sport
     const sportMatches = seniorMatches.filter(match => {
       try {
-        if (!match?.competition) return false;
-        const compLower = match.competition.toLowerCase();
+        if (!isValidMatch(match)) return false;
+        const compLower = String(match.competition).toLowerCase();
         if (sport === 'hurling') {
           return compLower.includes('hurling') || 
                  compLower.includes('camán') || 
@@ -464,6 +464,7 @@ function getLatestResults(matches: Match[] | undefined | null, sport: 'football'
     }
   } catch (error) {
     console.error('Error in getLatestResults:', error);
+    return { results: [], weekLabel: "Error Loading Results" };
   }
   
   console.log(`No ${sport} senior championship results found in the past year`);
@@ -509,11 +510,11 @@ function filterFutureFixtures(matches: Match[]): Match[] {
 }
 
 function getSimplifiedVenue(venue?: string | null): string {
-  if (!venue) return '';
+  if (!isValidString(venue)) return '';
   
   try {
     // Special case for Croke Park
-    const venueLower = venue.toLowerCase();
+    const venueLower = String(venue).toLowerCase();
     if (venueLower.includes('páirc an chrócaigh') || venueLower.includes('croke park')) {
       return 'Croke Park';
     }
@@ -587,7 +588,7 @@ function parseGAAScore(score: string): number {
 
 // Helper function to get team logo - now using inline SVG data URLs
 function getTeamLogo(teamName: string | undefined | null): string {
-  if (!teamName) {
+  if (!isValidString(teamName)) {
     // Return a default logo if no team name is provided
     return `data:image/svg+xml,${encodeURIComponent(`
       <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -605,90 +606,95 @@ function getTeamLogo(teamName: string | undefined | null): string {
     `)}`;
   }
 
-  const normalizedName = teamName.toLowerCase().trim();
-  
-  // County information with colors and initials
-  const countyInfo: Record<string, { initials: string; color: string; textColor?: string }> = {
-    'dublin': { initials: 'DUB', color: '#4A90E2', textColor: '#FFFFFF' }, // Sky blue
-    'kildare': { initials: 'KIL', color: '#FFFFFF', textColor: '#333333' }, // White
-    'meath': { initials: 'MEA', color: '#228B22', textColor: '#FFFFFF' }, // Green
-    'westmeath': { initials: 'WES', color: '#8B0000', textColor: '#FFFFFF' }, // Maroon
-    'wexford': { initials: 'WEX', color: '#9932CC', textColor: '#FFFFFF' }, // Purple
-    'wicklow': { initials: 'WIC', color: '#0000FF', textColor: '#FFFFFF' }, // Blue
-    'carlow': { initials: 'CAR', color: '#DC143C', textColor: '#FFFFFF' }, // Red
-    'kilkenny': { initials: 'KK', color: '#B45309', textColor: '#FFFFFF' }, // Dark gold
-    'laois': { initials: 'LAO', color: '#0000FF', textColor: '#FFFFFF' }, // Blue
-    'longford': { initials: 'LF', color: '#B45309', textColor: '#FFFFFF' }, // Dark gold
-    'louth': { initials: 'LOU', color: '#DC143C', textColor: '#FFFFFF' }, // Red
-    'offaly': { initials: 'OFF', color: '#228B22', textColor: '#FFFFFF' }, // Green
-    'cork': { initials: 'COR', color: '#DC143C', textColor: '#FFFFFF' }, // Red
-    'kerry': { initials: 'KER', color: '#228B22', textColor: '#FFFFFF' }, // Green
-    'limerick': { initials: 'LIM', color: '#228B22', textColor: '#FFFFFF' }, // Green
-    'tipperary': { initials: 'TIP', color: '#0000FF', textColor: '#FFFFFF' }, // Blue
-    'waterford': { initials: 'WAT', color: '#0000FF', textColor: '#FFFFFF' }, // Blue
-    'clare': { initials: 'CLA', color: '#B45309', textColor: '#FFFFFF' }, // Dark gold
-    'galway': { initials: 'GAL', color: '#8B0000', textColor: '#FFFFFF' }, // Maroon
-    'mayo': { initials: 'MAY', color: '#228B22', textColor: '#FFFFFF' }, // Green
-    'roscommon': { initials: 'ROS', color: '#B45309', textColor: '#FFFFFF' }, // Dark gold
-    'sligo': { initials: 'SLI', color: '#000000', textColor: '#FFFFFF' }, // Black
-    'leitrim': { initials: 'LEI', color: '#228B22', textColor: '#FFFFFF' }, // Green
-    'antrim': { initials: 'ANT', color: '#B45309', textColor: '#FFFFFF' }, // Dark gold
-    'armagh': { initials: 'ARM', color: '#FF8C00', textColor: '#FFFFFF' }, // Orange
-    'cavan': { initials: 'CAV', color: '#0000FF', textColor: '#FFFFFF' }, // Blue
-    'derry': { initials: 'DER', color: '#DC143C', textColor: '#FFFFFF' }, // Red
-    'donegal': { initials: 'DON', color: '#228B22', textColor: '#FFFFFF' }, // Green
-    'down': { initials: 'DOW', color: '#DC143C', textColor: '#FFFFFF' }, // Red
-    'fermanagh': { initials: 'FER', color: '#228B22', textColor: '#FFFFFF' }, // Green
-    'monaghan': { initials: 'MON', color: '#0000FF', textColor: '#FFFFFF' }, // Blue
-    'tyrone': { initials: 'TYR', color: '#DC143C', textColor: '#FFFFFF' }, // Red
-    'london': { initials: 'LON', color: '#228B22', textColor: '#FFFFFF' }, // Green
-    'new york': { initials: 'NY', color: '#0000FF', textColor: '#FFFFFF' }, // Blue
-  };
+  try {
+    const normalizedName = String(teamName).toLowerCase().trim();
+    
+    // County information with colors and initials
+    const countyInfo: Record<string, { initials: string; color: string; textColor?: string }> = {
+      'dublin': { initials: 'DUB', color: '#4A90E2', textColor: '#FFFFFF' }, // Sky blue
+      'kildare': { initials: 'KIL', color: '#FFFFFF', textColor: '#333333' }, // White
+      'meath': { initials: 'MEA', color: '#228B22', textColor: '#FFFFFF' }, // Green
+      'westmeath': { initials: 'WES', color: '#8B0000', textColor: '#FFFFFF' }, // Maroon
+      'wexford': { initials: 'WEX', color: '#9932CC', textColor: '#FFFFFF' }, // Purple
+      'wicklow': { initials: 'WIC', color: '#0000FF', textColor: '#FFFFFF' }, // Blue
+      'carlow': { initials: 'CAR', color: '#DC143C', textColor: '#FFFFFF' }, // Red
+      'kilkenny': { initials: 'KK', color: '#B45309', textColor: '#FFFFFF' }, // Dark gold
+      'laois': { initials: 'LAO', color: '#0000FF', textColor: '#FFFFFF' }, // Blue
+      'longford': { initials: 'LF', color: '#B45309', textColor: '#FFFFFF' }, // Dark gold
+      'louth': { initials: 'LOU', color: '#DC143C', textColor: '#FFFFFF' }, // Red
+      'offaly': { initials: 'OFF', color: '#228B22', textColor: '#FFFFFF' }, // Green
+      'cork': { initials: 'COR', color: '#DC143C', textColor: '#FFFFFF' }, // Red
+      'kerry': { initials: 'KER', color: '#228B22', textColor: '#FFFFFF' }, // Green
+      'limerick': { initials: 'LIM', color: '#228B22', textColor: '#FFFFFF' }, // Green
+      'tipperary': { initials: 'TIP', color: '#0000FF', textColor: '#FFFFFF' }, // Blue
+      'waterford': { initials: 'WAT', color: '#0000FF', textColor: '#FFFFFF' }, // Blue
+      'clare': { initials: 'CLA', color: '#B45309', textColor: '#FFFFFF' }, // Dark gold
+      'galway': { initials: 'GAL', color: '#8B0000', textColor: '#FFFFFF' }, // Maroon
+      'mayo': { initials: 'MAY', color: '#228B22', textColor: '#FFFFFF' }, // Green
+      'roscommon': { initials: 'ROS', color: '#B45309', textColor: '#FFFFFF' }, // Dark gold
+      'sligo': { initials: 'SLI', color: '#000000', textColor: '#FFFFFF' }, // Black
+      'leitrim': { initials: 'LEI', color: '#228B22', textColor: '#FFFFFF' }, // Green
+      'antrim': { initials: 'ANT', color: '#B45309', textColor: '#FFFFFF' }, // Dark gold
+      'armagh': { initials: 'ARM', color: '#FF8C00', textColor: '#FFFFFF' }, // Orange
+      'cavan': { initials: 'CAV', color: '#0000FF', textColor: '#FFFFFF' }, // Blue
+      'derry': { initials: 'DER', color: '#DC143C', textColor: '#FFFFFF' }, // Red
+      'donegal': { initials: 'DON', color: '#228B22', textColor: '#FFFFFF' }, // Green
+      'down': { initials: 'DOW', color: '#DC143C', textColor: '#FFFFFF' }, // Red
+      'fermanagh': { initials: 'FER', color: '#228B22', textColor: '#FFFFFF' }, // Green
+      'monaghan': { initials: 'MON', color: '#0000FF', textColor: '#FFFFFF' }, // Blue
+      'tyrone': { initials: 'TYR', color: '#DC143C', textColor: '#FFFFFF' }, // Red
+      'london': { initials: 'LON', color: '#228B22', textColor: '#FFFFFF' }, // Green
+      'new york': { initials: 'NY', color: '#0000FF', textColor: '#FFFFFF' }, // Blue
+    };
 
-  // Find county info
-  let info = countyInfo[normalizedName];
-  if (!info) {
-    // Partial match - check if team name contains county name
-    for (const [county, countyData] of Object.entries(countyInfo)) {
-      if (normalizedName.includes(county)) {
-        info = countyData;
-        break;
+    // Find county info
+    let info = countyInfo[normalizedName];
+    if (!info) {
+      // Partial match - check if team name contains county name
+      for (const [county, countyData] of Object.entries(countyInfo)) {
+        if (normalizedName.includes(county)) {
+          info = countyData;
+          break;
+        }
       }
     }
+
+    // Fallback
+    if (!info) {
+      info = { initials: 'GAA', color: '#228B22', textColor: '#FFFFFF' };
+    }
+
+    // Create SVG shield-style logo
+    const svgLogo = `
+      <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="1" dy="1" stdDeviation="1" flood-opacity="0.3"/>
+          </filter>
+        </defs>
+        <!-- Shield background -->
+        <path d="M12 2 L20 6 L20 14 C20 18 16 22 12 22 C8 22 4 18 4 14 L4 6 Z" 
+              fill="${info.color}" 
+              stroke="#333" 
+              stroke-width="0.5" 
+              filter="url(#shadow)"/>
+        <!-- Text -->
+        <text x="12" y="14" 
+              font-family="Arial, sans-serif" 
+              font-size="6" 
+              font-weight="bold" 
+              text-anchor="middle" 
+              fill="${info.textColor || '#FFFFFF'}">${info.initials}</text>
+      </svg>
+    `;
+
+    // Convert SVG to data URL
+    const encodedSvg = encodeURIComponent(svgLogo.trim());
+    return `data:image/svg+xml,${encodedSvg}`;
+  } catch (error) {
+    console.warn('Error getting team logo:', error);
+    return getTeamLogo(null); // Return default logo on error
   }
-
-  // Fallback
-  if (!info) {
-    info = { initials: 'GAA', color: '#228B22', textColor: '#FFFFFF' };
-  }
-
-  // Create SVG shield-style logo
-  const svgLogo = `
-    <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="1" dy="1" stdDeviation="1" flood-opacity="0.3"/>
-        </filter>
-      </defs>
-      <!-- Shield background -->
-      <path d="M12 2 L20 6 L20 14 C20 18 16 22 12 22 C8 22 4 18 4 14 L4 6 Z" 
-            fill="${info.color}" 
-            stroke="#333" 
-            stroke-width="0.5" 
-            filter="url(#shadow)"/>
-      <!-- Text -->
-      <text x="12" y="14" 
-            font-family="Arial, sans-serif" 
-            font-size="6" 
-            font-weight="bold" 
-            text-anchor="middle" 
-            fill="${info.textColor || '#FFFFFF'}">${info.initials}</text>
-    </svg>
-  `;
-
-  // Convert SVG to data URL
-  const encodedSvg = encodeURIComponent(svgLogo.trim());
-  return `data:image/svg+xml,${encodedSvg}`;
 }
 
 function MatchRow({ match }: { match: Match }) {

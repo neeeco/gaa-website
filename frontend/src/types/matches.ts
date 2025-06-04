@@ -15,6 +15,37 @@ export interface Match {
   createdAt?: string;
 }
 
+export function isValidString(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0;
+}
+
+export function isValidOptionalString(value: unknown): value is string | undefined {
+  return value === undefined || (typeof value === 'string' && value !== null);
+}
+
+export function isValidMatch(match: unknown): match is Match {
+  if (!match || typeof match !== 'object') return false;
+  
+  const m = match as any;
+  
+  if (!isValidString(m.competition)) return false;
+  if (!isValidString(m.homeTeam)) return false;
+  if (!isValidString(m.awayTeam)) return false;
+  if (!isValidString(m.date)) return false;
+  if (typeof m.isFixture !== 'boolean') return false;
+  
+  if (!isValidOptionalString(m.homeScore)) return false;
+  if (!isValidOptionalString(m.awayScore)) return false;
+  if (!isValidOptionalString(m.venue)) return false;
+  if (!isValidOptionalString(m.referee)) return false;
+  if (!isValidOptionalString(m.time)) return false;
+  if (!isValidOptionalString(m.broadcasting)) return false;
+  if (!isValidOptionalString(m.scrapedAt)) return false;
+  if (!isValidOptionalString(m.createdAt)) return false;
+  
+  return true;
+}
+
 export interface GroupTeam {
   name: string;
   played: number;

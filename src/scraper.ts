@@ -235,7 +235,12 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
     console.log('=== PAGE INSPECTION ===');
     console.log('All buttons found:', pageInfo.allButtons.length);
     pageInfo.allButtons.forEach((btn, i) => {
-      if (btn.text && (btn.text.toLowerCase().includes('april') || btn.text.toLowerCase().includes('month') || btn.text.toLowerCase().includes('may') || btn.text.toLowerCase().includes('jun'))) {
+      if (btn.text && (
+        String(btn.text).toLowerCase().includes('april') || 
+        String(btn.text).toLowerCase().includes('month') || 
+        String(btn.text).toLowerCase().includes('may') || 
+        String(btn.text).toLowerCase().includes('jun')
+      )) {
         console.log(`  Button ${i}: "${btn.text}" class="${btn.className}" id="${btn.id}"`);
       }
     });
@@ -260,10 +265,10 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
         for (const select of selects) {
           const options = Array.from(select.options);
           const aprilOption = options.find(opt => 
-            opt.text.toLowerCase().includes('april') || 
-            opt.text.toLowerCase().includes('apr') ||
-            opt.value === '4' || 
-            opt.value === '04'
+            String(opt.text || '').toLowerCase().includes('april') || 
+            String(opt.text || '').toLowerCase().includes('apr') ||
+            String(opt.value || '') === '4' || 
+            String(opt.value || '') === '04'
           );
           
           if (aprilOption) {
@@ -278,7 +283,7 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
         if (!clicked) {
           const buttons = document.querySelectorAll('button, .btn, [role="button"]');
           for (const button of buttons) {
-            const text = button.textContent?.toLowerCase() || '';
+            const text = String(button.textContent || '').toLowerCase();
             
             if (text.includes('april') || text.includes('apr')) {
               console.log(`Found April button: "${button.textContent}"`);
@@ -292,8 +297,8 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
         if (!clicked) {
           const buttons = document.querySelectorAll('button, .btn, [role="button"]');
           for (const button of buttons) {
-            const text = button.textContent?.toLowerCase() || '';
-            const classes = button.className.toLowerCase();
+            const text = String(button.textContent || '').toLowerCase();
+            const classes = String(button.className || '').toLowerCase();
             
             if (text.includes('‹') || text.includes('<') || text.includes('previous') || text.includes('prev') || 
                 classes.includes('prev') || classes.includes('back') || classes.includes('left')) {
@@ -315,7 +320,7 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
         const currentMonth = await page.evaluate(() => {
           const monthIndicators = document.querySelectorAll('[class*="month"], [class*="date"], .gar-matches-list__date');
           for (const indicator of monthIndicators) {
-            const text = indicator.textContent?.toLowerCase() || '';
+            const text = String(indicator.textContent || '').toLowerCase();
             if (text.includes('april') || text.includes('apr')) {
               return 'april';
             } else if (text.includes('may')) {
@@ -338,8 +343,8 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
             const clickedBack = await page.evaluate(() => {
               const buttons = document.querySelectorAll('button, .btn, [role="button"]');
               for (const button of buttons) {
-                const text = button.textContent?.toLowerCase() || '';
-                const classes = button.className.toLowerCase();
+                const text = String(button.textContent || '').toLowerCase();
+                const classes = String(button.className || '').toLowerCase();
                 
                 if (text.includes('‹') || text.includes('<') || text.includes('previous') || text.includes('prev') || 
                     classes.includes('prev') || classes.includes('back') || classes.includes('left')) {
@@ -361,8 +366,8 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
             const clickedForward = await page.evaluate(() => {
               const buttons = document.querySelectorAll('button, .btn, [role="button"]');
               for (const button of buttons) {
-                const text = button.textContent?.toLowerCase() || '';
-                const classes = button.className.toLowerCase();
+                const text = String(button.textContent || '').toLowerCase();
+                const classes = String(button.className || '').toLowerCase();
                 
                 if (text.includes('›') || text.includes('>') || text.includes('next') || 
                     classes.includes('next') || classes.includes('forward') || classes.includes('right')) {

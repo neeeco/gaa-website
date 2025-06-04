@@ -131,9 +131,15 @@ async function getMatches(options: {
                 filteredMatches = scrapedMatches.filter(match => match.isFixture === options.isFixture);
             }
             if (options.competition) {
-                filteredMatches = filteredMatches.filter(match => 
-                    match.competition.toLowerCase().includes(options.competition!.toLowerCase())
-                );
+                filteredMatches = filteredMatches.filter(match => {
+                    try {
+                        if (!match?.competition) return false;
+                        return String(match.competition).toLowerCase().includes(String(options.competition).toLowerCase());
+                    } catch (error) {
+                        console.warn('Error filtering matches by competition:', error);
+                        return false;
+                    }
+                });
             }
             
             return filteredMatches;
@@ -170,9 +176,15 @@ async function getMatches(options: {
             matches = matches.filter(match => match.isFixture === options.isFixture);
         }
         if (options.competition) {
-            matches = matches.filter(match => 
-                match.competition.toLowerCase().includes(options.competition!.toLowerCase())
-            );
+            matches = matches.filter(match => {
+                try {
+                    if (!match?.competition) return false;
+                    return String(match.competition).toLowerCase().includes(String(options.competition).toLowerCase());
+                } catch (error) {
+                    console.warn('Error filtering matches by competition:', error);
+                    return false;
+                }
+            });
         }
         
         return matches;

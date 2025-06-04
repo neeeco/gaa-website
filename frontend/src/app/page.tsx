@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Match, GroupTeam, Group } from '../types/matches';
 import { getMatches } from '@/services/matches';
 
@@ -50,12 +50,13 @@ function filterAllIrelandSFCMatches(matches: Match[]): Match[] {
   return matches.filter((match) => {
     try {
       if (!match?.competition) return false;
-      const compLower = match.competition.toLowerCase();
+      const compLower = String(match.competition).toLowerCase();
       return compLower.includes('all-ireland') && 
              compLower.includes('senior') && 
              compLower.includes('football') &&
              compLower.includes('championship');
     } catch {
+      console.warn('Error filtering All-Ireland SFC match:', match);
       return false;
     }
   });
@@ -67,9 +68,10 @@ function filterSeniorChampionships(matches: Match[]): Match[] {
   return matches.filter((match) => {
     try {
       if (!match?.competition) return false;
-      const compLower = match.competition.toLowerCase();
+      const compLower = String(match.competition).toLowerCase();
       return compLower.includes('senior championship');
     } catch {
+      console.warn('Error filtering senior championship match:', match);
       return false;
     }
   });
@@ -1145,10 +1147,13 @@ export default function HomePage() {
 
     const fetchData = async () => {
       try {
+        console.log('Fetching matches...');
         const data = await getMatches();
         
         // If component is unmounted, don't update state
         if (!mounted) return;
+
+        console.log('Raw data received:', data);
 
         if (!Array.isArray(data)) {
           console.error('Received invalid data format:', data);
@@ -1158,14 +1163,27 @@ export default function HomePage() {
         }
 
         // Filter out invalid matches first
-        const validMatches = data.filter(match => 
-          match && 
-          typeof match.competition === 'string' &&
-          typeof match.homeTeam === 'string' &&
-          typeof match.awayTeam === 'string' &&
-          typeof match.date === 'string' &&
-          typeof match.isFixture === 'boolean'
-        );
+        const validMatches = data.filter(match => {
+          if (!match) {
+            console.warn('Found null/undefined match');
+            return false;
+          }
+          
+          console.log('Validating match:', match);
+          
+          const isValid = match && 
+            typeof match.competition === 'string' &&
+            typeof match.homeTeam === 'string' &&
+            typeof match.awayTeam === 'string' &&
+            typeof match.date === 'string' &&
+            typeof match.isFixture === 'boolean';
+            
+          if (!isValid) {
+            console.warn('Invalid match found:', match);
+          }
+          
+          return isValid;
+        });
 
         if (validMatches.length < data.length) {
           console.warn(`Filtered out ${data.length - validMatches.length} invalid matches`);
@@ -1192,6 +1210,7 @@ export default function HomePage() {
           }));
         }
 
+        console.log('Setting valid matches:', validMatches);
         setMatches(validMatches);
         setLoading(false);
       } catch (err) {
@@ -1210,17 +1229,42 @@ export default function HomePage() {
   }, []);
 
   // Get latest senior championship results with intelligent fallback
-  const { results: latestResults, weekLabel } = getLatestResults(matches, activeSport);
+  const { results: latestResults, weekLabel } = useMemo(() => {
+    console.log('Getting latest results for sport:', activeSport);
+    return getLatestResults(matches, activeSport);
+  }, [matches, activeSport]);
   
   // Apply time-based filtering for fixtures (senior championships only)
-  const seniorMatches = filterSeniorChampionships(matches);
-  const upcomingFixtures = filterUpcomingFixtures(seniorMatches);
-  const futureFixtures = filterFutureFixtures(seniorMatches);
+  const seniorMatches = useMemo(() => {
+    console.log('Filtering senior championships');
+    return filterSeniorChampionships(matches);
+  }, [matches]);
+
+  const upcomingFixtures = useMemo(() => {
+    console.log('Filtering upcoming fixtures');
+    return filterUpcomingFixtures(seniorMatches);
+  }, [seniorMatches]);
+
+  const futureFixtures = useMemo(() => {
+    console.log('Filtering future fixtures');
+    return filterFutureFixtures(seniorMatches);
+  }, [seniorMatches]);
   
   // Group by sport and competition
-  const groupedLatestResults = groupSeniorChampionships(latestResults);
-  const groupedUpcomingFixtures = groupSeniorChampionships(upcomingFixtures);
-  const groupedFutureFixtures = groupSeniorChampionships(futureFixtures);
+  const groupedLatestResults = useMemo(() => {
+    console.log('Grouping latest results');
+    return groupSeniorChampionships(latestResults);
+  }, [latestResults]);
+
+  const groupedUpcomingFixtures = useMemo(() => {
+    console.log('Grouping upcoming fixtures');
+    return groupSeniorChampionships(upcomingFixtures);
+  }, [upcomingFixtures]);
+
+  const groupedFutureFixtures = useMemo(() => {
+    console.log('Grouping future fixtures');
+    return groupSeniorChampionships(futureFixtures);
+  }, [futureFixtures]);
 
   // Get current sport data
   const currentLatestResults = activeSport === 'football' ? groupedLatestResults.football : groupedLatestResults.hurling;
@@ -1228,8 +1272,14 @@ export default function HomePage() {
   const currentFutureFixtures = activeSport === 'football' ? groupedFutureFixtures.football : groupedFutureFixtures.hurling;
 
   // Update group data with real match results since May 17th
-  const updatedGroups = updateGroupDataWithMatches(allIrelandSFCGroups, matches);
-  const groupsComplete = isGroupStageComplete(updatedGroups);
+  const updatedGroups = useMemo(() => {
+    console.log('Updating group data with matches');
+    return updateGroupDataWithMatches(allIrelandSFCGroups, matches);
+  }, [matches]);
+
+  const groupsComplete = useMemo(() => {
+    return isGroupStageComplete(updatedGroups);
+  }, [updatedGroups]);
 
   return (
     <div className="min-h-screen bg-white">

@@ -720,14 +720,21 @@ function MatchRow({ match }: { match: Match }) {
                 className="object-contain"
               />
             </div>
-            <span className="ml-2 font-medium text-gray-900">{match.homeTeam}</span>
+            <div className="flex items-center">
+              <span className="ml-2 font-medium text-gray-900">{match.homeTeam}</span>
+              {isLive && (
+                <span className="ml-2 bg-red-500 text-white text-xs px-2 py-1 rounded font-bold">
+                  LIVE
+                </span>
+              )}
+            </div>
           </div>
           
           <div className="mx-4 text-center min-w-[80px]">
             {match.isFixture ? (
               <span className="text-sm text-gray-500">vs</span>
             ) : (
-              <div className="font-bold text-gray-900">
+              <div className={`font-bold ${isLive ? 'text-red-600' : 'text-gray-900'}`}>
                 {match.homeScore} - {match.awayScore}
               </div>
             )}
@@ -903,6 +910,7 @@ function updateGroupDataWithMatches(groups: Group[], matches: Match[]): Enhanced
     
     if (groupComplete) {
       // Group stage is complete - all positions are secured
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       group.teams.forEach((team, index) => {
         team.positionSecured = true;
         team.securedReason = 'Group stage complete';

@@ -431,32 +431,36 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
             const competition = match.closest('.gar-matches-list__group')?.querySelector('.gar-matches-list__group-name')?.textContent?.trim() || '';
             const date = match.closest('.gar-matches-list__day')?.querySelector('.gar-matches-list__date')?.textContent?.trim() || '';
             
-            // Extract team names using gar-match-item
+            // Extract team names using gar-match-item__teams
             let homeTeam = '';
             let awayTeam = '';
             
             console.log('Attempting to extract team names for match:', { competition, date });
             
-            // Get all match items and log their HTML for debugging
-            const matchItems = match.querySelectorAll('.gar-match-item');
-            console.log('Found match items:', Array.from(matchItems).map(el => ({
-                html: el.outerHTML,
-                text: el.textContent?.trim()
-            })));
+            // Get the teams container and log its HTML for debugging
+            const teamsContainer = match.querySelector('.gar-match-item__teams');
+            console.log('Found teams container:', teamsContainer ? {
+                html: teamsContainer.outerHTML,
+                text: teamsContainer.textContent?.trim()
+            } : 'No teams container found');
             
-            // Extract team names from the first match item
-            if (matchItems.length > 0) {
-                const matchItem = matchItems[0];
-                const teams = matchItem.textContent?.trim().split(/\s+v\s+|\s+vs\s+/i);
-                if (teams && teams.length >= 2) {
-                    homeTeam = teams[0].trim();
-                    awayTeam = teams[1].trim();
-                    console.log('Found teams from match item:', { homeTeam, awayTeam });
+            // Extract team names from the teams container
+            if (teamsContainer) {
+                const teams = Array.from(teamsContainer.children);
+                console.log('Found team elements:', teams.map(el => ({
+                    html: el.outerHTML,
+                    text: el.textContent?.trim()
+                })));
+                
+                if (teams.length >= 2) {
+                    homeTeam = teams[0].textContent?.trim() || '';
+                    awayTeam = teams[1].textContent?.trim() || '';
+                    console.log('Found teams:', { homeTeam, awayTeam });
                 } else {
-                    console.warn('Could not split teams using v/vs in match item text');
+                    console.warn('Could not find both team elements in teams container');
                 }
             } else {
-                console.warn('Could not find .gar-match-item element');
+                console.warn('Could not find .gar-match-item__teams container');
             }
             
             // Clean team names

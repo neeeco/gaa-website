@@ -1,3 +1,5 @@
+// GAA Fixtures and Results Scraper
+// Updated: June 4th, 2025 - Enhanced team name extraction
 import { chromium } from 'playwright';
 
 interface Match {

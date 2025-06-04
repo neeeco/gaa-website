@@ -426,39 +426,74 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
           const matches: any[] = [];
           document.querySelectorAll('.gar-match-item').forEach(match => {
             // Debug: Log the entire match HTML
-            console.log('Raw match HTML:', match.outerHTML);
+            console.log('Full match HTML:', match.outerHTML);
             
             const competition = match.closest('.gar-matches-list__group')?.querySelector('.gar-matches-list__group-name')?.textContent?.trim() || '';
             const date = match.closest('.gar-matches-list__day')?.querySelector('.gar-matches-list__date')?.textContent?.trim() || '';
             
-            // Extract team names using specific home/away selectors
+            // Extract team names with enhanced debugging
             let homeTeam = '';
             let awayTeam = '';
             
+            // Debug: Log the entire match HTML first
+            console.log('Full match HTML:', match.outerHTML);
             console.log('Attempting to extract team names for match:', { competition, date });
             
-            // Get home and away team elements
-            const homeTeamElement = match.querySelector('.gar-match-item__team.-home');
-            const awayTeamElement = match.querySelector('.gar-match-item__team.-away');
+            // Method 1: Try direct team name class
+            const teamNameElements = match.querySelectorAll('.gar-match-item__team-name');
+            console.log('Found team name elements:', Array.from(teamNameElements).map(el => ({
+                html: el.outerHTML,
+                text: el.textContent?.trim(),
+                parentClass: el.parentElement?.className
+            })));
             
-            console.log('Found team elements:', {
-                home: homeTeamElement ? {
-                    html: homeTeamElement.outerHTML,
-                    text: homeTeamElement.textContent?.trim()
-                } : 'No home team found',
-                away: awayTeamElement ? {
-                    html: awayTeamElement.outerHTML,
-                    text: awayTeamElement.textContent?.trim()
-                } : 'No away team found'
-            });
+            if (teamNameElements.length >= 2) {
+                homeTeam = teamNameElements[0].textContent?.trim() || '';
+                awayTeam = teamNameElements[1].textContent?.trim() || '';
+                console.log('Found teams using team-name class:', { homeTeam, awayTeam });
+            }
             
-            // Extract team names
-            if (homeTeamElement && awayTeamElement) {
-                homeTeam = homeTeamElement.textContent?.trim() || '';
-                awayTeam = awayTeamElement.textContent?.trim() || '';
-                console.log('Found teams:', { homeTeam, awayTeam });
-            } else {
-                console.warn('Could not find both home and away team elements');
+            // Method 2: Try home/away team elements if Method 1 failed
+            if (!homeTeam || !awayTeam) {
+                console.log('Trying home/away team selectors...');
+                const homeTeamElement = match.querySelector('.gar-match-item__team.-home');
+                const awayTeamElement = match.querySelector('.gar-match-item__team.-away');
+                
+                console.log('Found team elements:', {
+                    home: homeTeamElement ? {
+                        html: homeTeamElement.outerHTML,
+                        text: homeTeamElement.textContent?.trim(),
+                        children: Array.from(homeTeamElement?.children || []).map(el => ({
+                            class: el.className,
+                            text: el.textContent?.trim()
+                        }))
+                    } : 'No home team found',
+                    away: awayTeamElement ? {
+                        html: awayTeamElement.outerHTML,
+                        text: awayTeamElement.textContent?.trim(),
+                        children: Array.from(awayTeamElement?.children || []).map(el => ({
+                            class: el.className,
+                            text: el.textContent?.trim()
+                        }))
+                    } : 'No away team found'
+                });
+                
+                if (homeTeamElement && awayTeamElement) {
+                    // Try to find team names within these elements
+                    const homeNameEl = homeTeamElement.querySelector('.gar-match-item__team-name');
+                    const awayNameEl = awayTeamElement.querySelector('.gar-match-item__team-name');
+                    
+                    if (homeNameEl && awayNameEl) {
+                        homeTeam = homeNameEl.textContent?.trim() || '';
+                        awayTeam = awayNameEl.textContent?.trim() || '';
+                        console.log('Found teams using nested team-name class:', { homeTeam, awayTeam });
+                    } else {
+                        // Fallback to full element text if no specific team name element found
+                        homeTeam = homeTeamElement.textContent?.trim() || '';
+                        awayTeam = awayTeamElement.textContent?.trim() || '';
+                        console.log('Found teams using full element text:', { homeTeam, awayTeam });
+                    }
+                }
             }
             
             // Clean team names

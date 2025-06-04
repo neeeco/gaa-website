@@ -511,7 +511,25 @@ function parseGAAScore(score: string): number {
 }
 
 // Helper function to get team logo - now using inline SVG data URLs
-function getTeamLogo(teamName: string): string {
+function getTeamLogo(teamName: string | undefined | null): string {
+  if (!teamName) {
+    // Return a default logo if no team name is provided
+    return `data:image/svg+xml,${encodeURIComponent(`
+      <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2 L20 6 L20 14 C20 18 16 22 12 22 C8 22 4 18 4 14 L4 6 Z" 
+              fill="#228B22" 
+              stroke="#333" 
+              stroke-width="0.5"/>
+        <text x="12" y="14" 
+              font-family="Arial, sans-serif" 
+              font-size="6" 
+              font-weight="bold" 
+              text-anchor="middle" 
+              fill="#FFFFFF">GAA</text>
+      </svg>
+    `)}`;
+  }
+
   const normalizedName = teamName.toLowerCase().trim();
   
   // County information with colors and initials

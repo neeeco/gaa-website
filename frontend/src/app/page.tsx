@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import Image from 'next/image';
 import { Match, GroupTeam, Group, isValidMatch, isValidString } from '../types/matches';
 import { getMatches } from '@/services/matches';
 
@@ -702,55 +703,50 @@ function MatchRow({ match }: { match: Match }) {
   const isLive = isMatchLive(match);
   const venue = getSimplifiedVenue(match.venue);
   const dateDesc = getDateDescription(match);
-  
+  const homeTeamLogo = getTeamLogo(match.homeTeam);
+  const awayTeamLogo = getTeamLogo(match.awayTeam);
+
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
-      <div className="flex items-center">
-        {/* Teams and Scores Container */}
-        <div className="flex-1 min-w-0">
-          {/* Home Team Row */}
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center flex-1 min-w-0 mr-4">
-              <img 
-                src={getTeamLogo(match.homeTeam)} 
+    <div className="bg-white rounded-lg shadow-sm p-3 hover:shadow-md transition-shadow">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center flex-grow">
+          <div className="flex items-center min-w-[120px] flex-shrink-0">
+            <div className="w-8 h-8 relative">
+              <Image 
+                src={homeTeamLogo} 
                 alt={`${match.homeTeam} logo`}
-                className="w-6 h-6 mr-3 flex-shrink-0"
+                width={32}
+                height={32}
+                className="object-contain"
               />
-              <span className="font-medium text-gray-900 truncate">{match.homeTeam}</span>
-              {isLive && (
-                <span className="ml-2 bg-red-500 text-white text-xs px-2 py-1 rounded font-bold flex-shrink-0">
-                  LIVE
-                </span>
-              )}
             </div>
-            <div className={`text-right font-bold w-16 ${isLive ? 'text-gray-400' : 'text-gray-900'}`}>
-              {match.isFixture ? (
-                <span className="text-sm text-gray-500">{match.time || 'TBC'}</span>
-              ) : (
-                <span className="text-lg">{match.homeScore}</span>
-              )}
-            </div>
+            <span className="ml-2 font-medium text-gray-900">{match.homeTeam}</span>
           </div>
           
-          {/* Away Team Row */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center flex-1 min-w-0 mr-4">
-              <img 
-                src={getTeamLogo(match.awayTeam)} 
+          <div className="mx-4 text-center min-w-[80px]">
+            {match.isFixture ? (
+              <span className="text-sm text-gray-500">vs</span>
+            ) : (
+              <div className="font-bold text-gray-900">
+                {match.homeScore} - {match.awayScore}
+              </div>
+            )}
+          </div>
+          
+          <div className="flex items-center min-w-[120px] flex-shrink-0">
+            <div className="w-8 h-8 relative">
+              <Image 
+                src={awayTeamLogo} 
                 alt={`${match.awayTeam} logo`}
-                className="w-6 h-6 mr-3 flex-shrink-0"
+                width={32}
+                height={32}
+                className="object-contain"
               />
-              <span className="font-medium text-gray-900 truncate">{match.awayTeam}</span>
             </div>
-            <div className={`text-right font-bold w-16 ${isLive ? 'text-gray-400' : 'text-gray-900'}`}>
-              {match.isFixture ? '' : (
-                <span className="text-lg">{match.awayScore}</span>
-              )}
-            </div>
+            <span className="ml-2 font-medium text-gray-900">{match.awayTeam}</span>
           </div>
         </div>
         
-        {/* Match Info */}
         <div className="ml-6 text-right text-sm text-gray-500 flex-shrink-0 w-24">
           <div>{dateDesc}</div>
           {venue && <div className="truncate">{venue}</div>}
@@ -767,8 +763,8 @@ function CompetitionSection({ competition, matches }: { competition: string; mat
         {competition}
       </h3>
       <div className="space-y-2">
-        {matches.map((match, index) => (
-          <MatchRow key={`${match.homeTeam}-${match.awayTeam}-${index}`} match={match} />
+        {matches.map((match) => (
+          <MatchRow key={`${match.homeTeam}-${match.awayTeam}-${match.date}`} match={match} />
         ))}
       </div>
     </div>
@@ -998,8 +994,6 @@ function isGroupStageComplete(groups: EnhancedGroup[]): boolean {
 }
 
 function GroupTable({ group }: { group: EnhancedGroup }) {
-  const groupComplete = group.teams.every(team => team.played >= 3); // Each team plays 3 matches
-  
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
       {/* Group Header */}
@@ -1072,11 +1066,15 @@ function GroupTable({ group }: { group: EnhancedGroup }) {
                       <span className={`mr-2 text-xs font-bold ${team.positionSecured ? 'text-gray-800' : 'text-gray-500'}`}>
                         {statusIcon}
                       </span>
-                      <img 
-                        src={getTeamLogo(team.name)} 
-                        alt={`${team.name} logo`}
-                        className="w-5 h-5 mr-2 flex-shrink-0"
-                      />
+                      <div className="w-5 h-5 relative mr-2 flex-shrink-0">
+                        <Image 
+                          src={getTeamLogo(team.name)} 
+                          alt={`${team.name} logo`}
+                          width={20}
+                          height={20}
+                          className="object-contain"
+                        />
+                      </div>
                       <span className={`font-medium ${team.positionSecured ? 'text-gray-900 font-bold' : 'text-gray-900'}`}>
                         {team.name}
                       </span>

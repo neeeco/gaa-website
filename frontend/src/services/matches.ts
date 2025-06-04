@@ -3,36 +3,38 @@ import { Match } from '@/types/matches';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 // Enhanced validation to ensure all required fields are present and properly typed
-function validateMatch(match: any): match is Match {
+function validateMatch(match: unknown): match is Match {
   try {
     if (!match || typeof match !== 'object') return false;
 
+    const m = match as Partial<Match>;
+
     // Required fields must be present and of correct type
     const hasRequiredFields = 
-      typeof match.competition === 'string' && match.competition.length > 0 &&
-      typeof match.homeTeam === 'string' && match.homeTeam.length > 0 &&
-      typeof match.awayTeam === 'string' && match.awayTeam.length > 0 &&
-      typeof match.date === 'string' && match.date.length > 0 &&
-      typeof match.isFixture === 'boolean';
+      typeof m.competition === 'string' && m.competition.length > 0 &&
+      typeof m.homeTeam === 'string' && m.homeTeam.length > 0 &&
+      typeof m.awayTeam === 'string' && m.awayTeam.length > 0 &&
+      typeof m.date === 'string' && m.date.length > 0 &&
+      typeof m.isFixture === 'boolean';
 
     if (!hasRequiredFields) return false;
 
     // Optional fields must be of correct type if present
-    if (match.homeScore !== undefined && typeof match.homeScore !== 'string') return false;
-    if (match.awayScore !== undefined && typeof match.awayScore !== 'string') return false;
-    if (match.venue !== undefined && typeof match.venue !== 'string') return false;
-    if (match.referee !== undefined && typeof match.referee !== 'string') return false;
-    if (match.time !== undefined && typeof match.time !== 'string') return false;
-    if (match.broadcasting !== undefined && typeof match.broadcasting !== 'string') return false;
-    if (match.scrapedAt !== undefined && typeof match.scrapedAt !== 'string') return false;
-    if (match.createdAt !== undefined && typeof match.createdAt !== 'string') return false;
+    if (m.homeScore !== undefined && typeof m.homeScore !== 'string') return false;
+    if (m.awayScore !== undefined && typeof m.awayScore !== 'string') return false;
+    if (m.venue !== undefined && typeof m.venue !== 'string') return false;
+    if (m.referee !== undefined && typeof m.referee !== 'string') return false;
+    if (m.time !== undefined && typeof m.time !== 'string') return false;
+    if (m.broadcasting !== undefined && typeof m.broadcasting !== 'string') return false;
+    if (m.scrapedAt !== undefined && typeof m.scrapedAt !== 'string') return false;
+    if (m.createdAt !== undefined && typeof m.createdAt !== 'string') return false;
 
     // Ensure no null values in string fields
     const stringFields = ['competition', 'homeTeam', 'awayTeam', 'date', 'homeScore', 'awayScore', 
-                         'venue', 'referee', 'time', 'broadcasting', 'scrapedAt', 'createdAt'];
+                         'venue', 'referee', 'time', 'broadcasting', 'scrapedAt', 'createdAt'] as const;
     
     for (const field of stringFields) {
-      if (match[field] === null) match[field] = undefined;
+      if (m[field] === null) m[field] = undefined;
     }
 
     return true;
@@ -56,7 +58,7 @@ export async function getMatches(isFixture?: boolean): Promise<Match[]> {
     const data = await response.json();
     
     // Handle new API response format
-    const rawMatches = (data.matches || data) as any[];
+    const rawMatches = (data.matches || data) as unknown[];
     
     if (!Array.isArray(rawMatches)) {
       console.error('Received invalid matches format:', rawMatches);
@@ -65,22 +67,22 @@ export async function getMatches(isFixture?: boolean): Promise<Match[]> {
 
     // Filter out invalid matches and normalize data
     const validMatches = rawMatches
-      .filter(match => match !== null && match !== undefined)
-      .map(match => ({
+      .filter((match): match is NonNullable<typeof match> => match !== null && match !== undefined)
+      .map((match: Record<string, unknown>) => ({
         ...match,
         // Ensure string fields are never null
-        competition: match.competition || '',
-        homeTeam: match.homeTeam || '',
-        awayTeam: match.awayTeam || '',
-        date: match.date || '',
-        homeScore: match.homeScore || undefined,
-        awayScore: match.awayScore || undefined,
-        venue: match.venue || undefined,
-        referee: match.referee || undefined,
-        time: match.time || undefined,
-        broadcasting: match.broadcasting || undefined,
-        scrapedAt: match.scrapedAt || undefined,
-        createdAt: match.createdAt || undefined,
+        competition: typeof match.competition === 'string' ? match.competition : '',
+        homeTeam: typeof match.homeTeam === 'string' ? match.homeTeam : '',
+        awayTeam: typeof match.awayTeam === 'string' ? match.awayTeam : '',
+        date: typeof match.date === 'string' ? match.date : '',
+        homeScore: typeof match.homeScore === 'string' ? match.homeScore : undefined,
+        awayScore: typeof match.awayScore === 'string' ? match.awayScore : undefined,
+        venue: typeof match.venue === 'string' ? match.venue : undefined,
+        referee: typeof match.referee === 'string' ? match.referee : undefined,
+        time: typeof match.time === 'string' ? match.time : undefined,
+        broadcasting: typeof match.broadcasting === 'string' ? match.broadcasting : undefined,
+        scrapedAt: typeof match.scrapedAt === 'string' ? match.scrapedAt : undefined,
+        createdAt: typeof match.createdAt === 'string' ? match.createdAt : undefined,
         isFixture: Boolean(match.isFixture)
       }))
       .filter(validateMatch);

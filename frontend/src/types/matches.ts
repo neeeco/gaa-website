@@ -26,7 +26,7 @@ export function isValidOptionalString(value: unknown): value is string | undefin
 export function isValidMatch(match: unknown): match is Match {
   if (!match || typeof match !== 'object') return false;
   
-  const m = match as any;
+  const m = match as Partial<Match>;
   
   if (!isValidString(m.competition)) return false;
   if (!isValidString(m.homeTeam)) return false;

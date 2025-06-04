@@ -22,12 +22,6 @@ interface CacheData {
     timestamp: number;
 }
 
-// Ensure data directory exists
-const dataDir = path.join(__dirname, '../data');
-if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-}
-
 // Initialize database
 let dbInitialized = false;
 async function initDatabase() {

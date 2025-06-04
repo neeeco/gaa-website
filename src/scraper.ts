@@ -431,36 +431,34 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
             const competition = match.closest('.gar-matches-list__group')?.querySelector('.gar-matches-list__group-name')?.textContent?.trim() || '';
             const date = match.closest('.gar-matches-list__day')?.querySelector('.gar-matches-list__date')?.textContent?.trim() || '';
             
-            // Extract team names using gar-match-item__teams
+            // Extract team names using specific home/away selectors
             let homeTeam = '';
             let awayTeam = '';
             
             console.log('Attempting to extract team names for match:', { competition, date });
             
-            // Get the teams container and log its HTML for debugging
-            const teamsContainer = match.querySelector('.gar-match-item__teams');
-            console.log('Found teams container:', teamsContainer ? {
-                html: teamsContainer.outerHTML,
-                text: teamsContainer.textContent?.trim()
-            } : 'No teams container found');
+            // Get home and away team elements
+            const homeTeamElement = match.querySelector('.gar-match-item__team.-home');
+            const awayTeamElement = match.querySelector('.gar-match-item__team.-away');
             
-            // Extract team names from the teams container
-            if (teamsContainer) {
-                const teams = Array.from(teamsContainer.children);
-                console.log('Found team elements:', teams.map(el => ({
-                    html: el.outerHTML,
-                    text: el.textContent?.trim()
-                })));
-                
-                if (teams.length >= 2) {
-                    homeTeam = teams[0].textContent?.trim() || '';
-                    awayTeam = teams[1].textContent?.trim() || '';
-                    console.log('Found teams:', { homeTeam, awayTeam });
-                } else {
-                    console.warn('Could not find both team elements in teams container');
-                }
+            console.log('Found team elements:', {
+                home: homeTeamElement ? {
+                    html: homeTeamElement.outerHTML,
+                    text: homeTeamElement.textContent?.trim()
+                } : 'No home team found',
+                away: awayTeamElement ? {
+                    html: awayTeamElement.outerHTML,
+                    text: awayTeamElement.textContent?.trim()
+                } : 'No away team found'
+            });
+            
+            // Extract team names
+            if (homeTeamElement && awayTeamElement) {
+                homeTeam = homeTeamElement.textContent?.trim() || '';
+                awayTeam = awayTeamElement.textContent?.trim() || '';
+                console.log('Found teams:', { homeTeam, awayTeam });
             } else {
-                console.warn('Could not find .gar-match-item__teams container');
+                console.warn('Could not find both home and away team elements');
             }
             
             // Clean team names

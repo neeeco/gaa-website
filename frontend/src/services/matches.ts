@@ -1,6 +1,7 @@
 import { Match } from '@/types/matches';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+// where to find backend:   https://gaa-website-production.up.railway.app
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
 export async function getMatches(isFixture?: boolean): Promise<Match[]> {
   try {
@@ -10,7 +11,8 @@ export async function getMatches(isFixture?: boolean): Promise<Match[]> {
       
     console.log('Fetching matches from:', url);
     const response = await fetch(url);
-    
+
+        
     if (!response.ok) {
       const errorText = await response.text();
       console.error('API error response:', {

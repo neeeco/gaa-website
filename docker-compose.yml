@@ -8,6 +8,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
+      - DATABASE_URL=postgresql://postgres:WAHiuVCRoxTQsKfyNUNkEAXnSNZRAnjS@centerbeam.proxy.rlwy.net:28138/railway
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs

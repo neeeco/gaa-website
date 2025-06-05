@@ -205,12 +205,12 @@ class MatchDatabase {
     }
 
     const { rows } = await this.pool!.query(sql, params);
-    
+
     return rows.map(row => ({
       id: row.id,
       competition: row.competition,
-      homeTeam: row.homeTeam,
-      awayTeam: row.awayTeam,
+      homeTeam: row.hometeam,
+      awayTeam: row.awayteam,
       homeScore: row.homescore,
       awayScore: row.awayscore,
       venue: row.venue,

@@ -942,10 +942,11 @@ function MatchRow({ match }: { match: Match }) {
 
   return (
     <div className="bg-gray-50 hover:bg-gray-100 transition-colors p-4 rounded-lg">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-8">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+        {/* Teams and Score */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:space-x-8 space-y-4 lg:space-y-0">
           {/* Home Team */}
-          <div className="flex items-center min-w-[140px]">
+          <div className="flex items-center">
             <div className="w-8 h-8 relative">
               <Image 
                 src={homeTeamLogo} 
@@ -959,18 +960,14 @@ function MatchRow({ match }: { match: Match }) {
           </div>
           
           {/* Score/VS */}
-          <div className="text-center min-w-[100px] font-medium">
-            {match.isFixture ? (
-              <span className="text-gray-600">vs</span>
-            ) : (
-              <span className={`${isLive ? 'text-red-600' : 'text-gray-900'}`}>
-                {match.homeScore} - {match.awayScore}
-              </span>
-            )}
+          <div className="flex items-center">
+            <span className={`${isLive ? 'text-red-600' : 'text-gray-900'} font-medium`}>
+              {match.isFixture ? 'vs' : `${match.homeScore} - ${match.awayScore}`}
+            </span>
           </div>
           
           {/* Away Team */}
-          <div className="flex items-center min-w-[140px]">
+          <div className="flex items-center">
             <div className="w-8 h-8 relative">
               <Image 
                 src={awayTeamLogo} 
@@ -985,15 +982,17 @@ function MatchRow({ match }: { match: Match }) {
         </div>
         
         {/* Date, Time, Venue and Live Status */}
-        <div className="flex items-center space-x-6">
-          <div className="text-right text-sm text-gray-600 min-w-[100px]">
-            {venue}
-          </div>
-          <div className="text-right text-sm text-gray-900 font-medium min-w-[140px]">
+        <div className="flex flex-col lg:flex-row lg:items-center space-y-2 lg:space-y-0 lg:space-x-6">
+          {venue && (
+            <div className="text-sm text-gray-600">
+              {venue}
+            </div>
+          )}
+          <div className="text-sm text-gray-900 font-medium">
             {dateDesc}
           </div>
           {isLive && (
-            <span className="bg-red-500 text-white text-xs px-2 py-1 rounded font-bold">
+            <span className="bg-red-500 text-white text-xs px-2 py-1 rounded font-bold w-fit">
               LIVE
             </span>
           )}

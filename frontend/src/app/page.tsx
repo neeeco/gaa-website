@@ -153,32 +153,6 @@ function parseMatchDate(match: Match | undefined | null): Date {
   }
 }
 
-// Helper function to get the upcoming weekend dates
-function getUpcomingWeekendDates(): { saturday: Date; sunday: Date } {
-  const now = new Date();
-  const irishDate = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Dublin' }));
-  
-  // Get the current day (0 = Sunday, 1 = Monday, etc.)
-  const currentDay = irishDate.getDay();
-  
-  // Calculate days until next Saturday
-  const daysToSaturday = currentDay === 6 ? 0 : // If today is Saturday
-                        currentDay === 0 ? 6 : // If today is Sunday
-                        6 - currentDay; // Days until Saturday
-  
-  // Create Saturday date
-  const saturday = new Date(irishDate);
-  saturday.setDate(irishDate.getDate() + daysToSaturday);
-  saturday.setHours(0, 0, 0, 0);
-  
-  // Create Sunday date
-  const sunday = new Date(saturday);
-  sunday.setDate(saturday.getDate() + 1);
-  sunday.setHours(23, 59, 59, 999);
-  
-  return { saturday, sunday };
-}
-
 // Group matches by weekend and day
 function groupMatchesByWeekendAndDay(matches: Match[]): {
   grouped: Record<string, Record<string, Match[]>>;

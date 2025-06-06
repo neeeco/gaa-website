@@ -310,32 +310,6 @@ function groupSeniorChampionships(matches: Match[]) {
   return groups;
 }
 
-// Helper function to get start and end of current week (Monday to Sunday, Irish time)
-function getCurrentWeekRange(): { start: Date; end: Date } {
-  const now = new Date();
-  
-  // Convert to Irish time
-  const irishDate = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Dublin' }));
-  
-  // Get the current day (0 = Sunday, 1 = Monday, etc.)
-  const currentDay = irishDate.getDay();
-  
-  // Calculate days since last Monday
-  const daysFromMonday = currentDay === 0 ? 6 : currentDay - 1;
-  
-  // Set to start of current week (Monday 00:00)
-  const start = new Date(irishDate);
-  start.setDate(irishDate.getDate() - daysFromMonday);
-  start.setHours(0, 0, 0, 0);
-  
-  // Set to end of week (Sunday 23:59:59.999)
-  const end = new Date(start);
-  end.setDate(start.getDate() + 6);
-  end.setHours(23, 59, 59, 999);
-  
-  return { start, end };
-}
-
 // Helper function to get the upcoming weekend dates
 function getUpcomingWeekendDates(): { saturday: Date; sunday: Date } {
   const now = new Date();
@@ -1444,32 +1418,6 @@ export default function HomePage() {
     return filterFutureFixtures(seniorMatches);
   }, [seniorMatches]);
   
-  // Group by sport and competition
-  const groupedLatestResults = useMemo(() => {
-    console.log('Grouping latest results');
-    return groupSeniorChampionships(latestResults);
-  }, [latestResults]);
-
-  const groupedUpcomingFixtures = useMemo(() => {
-    console.log('Grouping upcoming fixtures');
-    return groupSeniorChampionships(upcomingFixtures);
-  }, [upcomingFixtures]);
-
-  const groupedFutureFixtures = useMemo(() => {
-    console.log('Grouping future fixtures');
-    return groupSeniorChampionships(futureFixtures);
-  }, [futureFixtures]);
-
-  // Update group data with real match results since May 17th
-  const updatedGroups = useMemo(() => {
-    console.log('Updating group data with matches');
-    return updateGroupDataWithMatches(allIrelandSFCGroups, matches);
-  }, [matches]);
-
-  const groupsComplete = useMemo(() => {
-    return isGroupStageComplete(updatedGroups);
-  }, [updatedGroups]);
-
   // Get all results and fixtures for current sport
   const allResults = useMemo(() => {
     return matches
@@ -1511,6 +1459,16 @@ export default function HomePage() {
   useEffect(() => {
     setWeekendDatesMap({ ...resultsWeekendMap, ...fixturesWeekendMap });
   }, [resultsWeekendMap, fixturesWeekendMap]);
+
+  // Update group data with real match results since May 17th
+  const updatedGroups = useMemo(() => {
+    console.log('Updating group data with matches');
+    return updateGroupDataWithMatches(allIrelandSFCGroups, matches);
+  }, [matches]);
+
+  const groupsComplete = useMemo(() => {
+    return isGroupStageComplete(updatedGroups);
+  }, [updatedGroups]);
 
   return (
     <div className="min-h-screen bg-white">

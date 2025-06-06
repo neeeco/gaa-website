@@ -696,11 +696,21 @@ function getWeekDescription(weekKey: string, weekendMap: Record<string, { saturd
       weekend.sunday.getDate() === 1;
 
     if (isRoundTwo) {
-      const saturdayDate = addOrdinalSuffix(weekend.saturday.getDate());
-      const sundayDate = addOrdinalSuffix(weekend.sunday.getDate());
-      const saturdayMonth = weekend.saturday.toLocaleDateString('en-IE', { month: 'long' });
-      const sundayMonth = weekend.sunday.toLocaleDateString('en-IE', { month: 'long' });
-      return `Round 2 (${saturdayMonth} ${saturdayDate}/${sundayMonth} ${sundayDate})`;
+      // Check if there are any football matches this weekend
+      const hasFootballMatches = matches?.some(match => {
+        const compLower = match.competition?.toLowerCase() || '';
+        return compLower.includes('all-ireland') && 
+               compLower.includes('senior') && 
+               isFootballMatch(match);
+      });
+
+      if (hasFootballMatches) {
+        const saturdayDate = addOrdinalSuffix(weekend.saturday.getDate());
+        const sundayDate = addOrdinalSuffix(weekend.sunday.getDate());
+        const saturdayMonth = weekend.saturday.toLocaleDateString('en-IE', { month: 'long' });
+        const sundayMonth = weekend.sunday.toLocaleDateString('en-IE', { month: 'long' });
+        return `Round 2 (${saturdayMonth} ${saturdayDate}/${sundayMonth} ${sundayDate})`;
+      }
     }
 
     // Check if it's Round 1 weekend (either May 17th/18th or May 24th/25th)
@@ -710,10 +720,20 @@ function getWeekDescription(weekKey: string, weekendMap: Record<string, { saturd
        (weekend.saturday.getDate() === 24 && weekend.sunday.getDate() === 25));
 
     if (isRoundOne) {
-      const saturdayDate = addOrdinalSuffix(weekend.saturday.getDate());
-      const sundayDate = addOrdinalSuffix(weekend.sunday.getDate());
-      const month = weekend.saturday.toLocaleDateString('en-IE', { month: 'long' });
-      return `Round 1 (${month} ${saturdayDate}/${sundayDate})`;
+      // Check if there are any football matches this weekend
+      const hasFootballMatches = matches?.some(match => {
+        const compLower = match.competition?.toLowerCase() || '';
+        return compLower.includes('all-ireland') && 
+               compLower.includes('senior') && 
+               isFootballMatch(match);
+      });
+
+      if (hasFootballMatches) {
+        const saturdayDate = addOrdinalSuffix(weekend.saturday.getDate());
+        const sundayDate = addOrdinalSuffix(weekend.sunday.getDate());
+        const month = weekend.saturday.toLocaleDateString('en-IE', { month: 'long' });
+        return `Round 1 (${month} ${saturdayDate}/${sundayDate})`;
+      }
     }
 
     // Check for Finals, Semi-Finals, and Quarter-Finals if matches are provided
@@ -1381,8 +1401,7 @@ export default function HomePage() {
       {/* Disclaimer */}
       <footer className="max-w-6xl mx-auto px-4 py-6 border-t border-gray-200">
         <p className="text-sm text-gray-500 text-center">
-          This website is not affiliated with, endorsed by, or officially connected with the GAA or any official GAA bodies. 
-          It is an independent fan project created to provide easy access to publicly available GAA match information.
+          This site is an independent fan project created to provide easy access to publicly available GAA match information. It is not affiliated with the Gaelic Athletic Association.
         </p>
       </footer>
     </div>

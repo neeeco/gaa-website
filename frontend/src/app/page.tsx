@@ -16,9 +16,9 @@ function isHurlingMatch(match: Match): boolean {
     
     // Check if it's a hurling match
     const isHurling = compLower.includes('hurling') || 
-                     compLower.includes('camán') || 
-                     compLower.includes('iomaint') ||
-                     compLower.includes('camogie');
+           compLower.includes('camán') || 
+           compLower.includes('iomaint') ||
+           compLower.includes('camogie');
     
     // Must be hurling but not minor
     return isHurling && !isMinor;
@@ -1613,9 +1613,9 @@ export default function HomePage() {
           {/* Top Bar */}
           <div className="flex items-center justify-between h-16">
             <div>
-              <h1 className="text-2xl font-audiowide text-gray-900">
-                gaa<span className="text-orange-500">Today</span>
-              </h1>
+            <h1 className="text-2xl font-audiowide text-gray-900">
+              gaa<span className="text-gray-500">Today</span>
+            </h1>
               <p className="text-xs text-gray-500 -mt-1 font-medium">ALL DAY, ALL-IRELAND.</p>
             </div>
             <div className="text-sm text-gray-600">
@@ -1740,11 +1740,11 @@ export default function HomePage() {
                                       return timeB - timeA; // Sort matches within day from latest to earliest
                                     })
                                     .map((match, index) => (
-                                      <MatchRow 
+                                    <MatchRow 
                                         key={`${match.homeTeam}-${match.awayTeam}-${match.date}-${match.time || ''}-${index}`} 
-                                        match={match} 
-                                      />
-                                    ))}
+                                      match={match} 
+                                    />
+                                  ))}
                                 </div>
                               </div>
                             );
@@ -1831,15 +1831,6 @@ export default function HomePage() {
           </div>
         )}
       </main>
-
-      {/* Footer with Disclaimer */}
-      <footer className="border-t border-gray-200 mt-8">
-        <div className="max-w-6xl mx-auto px-4 py-6">
-          <p className="text-sm text-gray-500 text-center">
-            This site is an independent, unofficial source of Gaelic games information. It is not affiliated with or endorsed by the Gaelic Athletic Association.
-          </p>
-        </div>
-      </footer>
     </div>
   );
 }

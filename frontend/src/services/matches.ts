@@ -1,7 +1,7 @@
 import { Match } from '@/types/matches';
 
 // where to find backend:   https://gaa-website-production.up.railway.app   or rvert back to 'http://localhost:3000';
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://gaa-website-production.up.railway.app';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
 export async function getMatches(isFixture?: boolean): Promise<Match[]> {
   try {

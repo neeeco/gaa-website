@@ -24,24 +24,39 @@ RUN apt-get update && apt-get install -y \
     libasound2 \
     && rm -rf /var/lib/apt/lists/*
 
-# Set up working directory
+# Create app directory and ensure proper permissions
 WORKDIR /app
+RUN mkdir -p /app/data && chown -R node:node /app
 
-# Copy package files
-COPY package*.json ./
+# Switch to non-root user
+USER node
+
+# Copy package files with correct ownership
+COPY --chown=node:node package*.json ./
 
 # Install dependencies and Playwright browser
-RUN npm install && \
+RUN npm ci && \
     npx playwright install chromium --with-deps
 
-# Copy source code
-COPY . .
+# Copy source code with correct ownership
+COPY --chown=node:node . .
+
+# Create necessary directories with proper permissions
+RUN mkdir -p /app/data /app/logs
 
 # Build TypeScript
 RUN npm run build
 
+# Set environment variables
+ENV NODE_ENV=production
+ENV PORT=3001
+
 # Expose port
 EXPOSE 3001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:${PORT}/health || exit 1
 
 # Start the server
 CMD ["npm", "start"] 

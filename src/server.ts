@@ -12,8 +12,14 @@ const port = parseInt(process.env.PORT || '3001', 10);
 app.use(cors());
 app.use(express.json());
 
+// Ensure data directory exists
+const DATA_DIR = path.join(__dirname, '../data');
+if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
 // Cache configuration for legacy fallback
-const CACHE_FILE = path.join(__dirname, '../data/matches.json');
+const CACHE_FILE = path.join(DATA_DIR, 'matches.json');
 const CACHE_DURATION = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
 const DB_STALE_DURATION = 4 * 60 * 60 * 1000; // 4 hours - when to consider DB data stale
 
@@ -22,16 +28,26 @@ interface CacheData {
     timestamp: number;
 }
 
-// Initialize database
+// Initialize database with timeout
 let dbInitialized = false;
 async function initDatabase() {
     if (!dbInitialized) {
         try {
-            await matchDatabase.init();
+            // Add timeout to database initialization
+            const timeout = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Database initialization timeout')), 30000)
+            );
+            
+            await Promise.race([
+                matchDatabase.init(),
+                timeout
+            ]);
+            
             dbInitialized = true;
             console.log('Database initialized successfully');
         } catch (error) {
             console.error('Failed to initialize database:', error);
+            // Don't throw error, allow fallback to cache
         }
     }
 }
@@ -330,25 +346,9 @@ app.get('/api/matches/legacy', async (req, res) => {
     }
 });
 
-// Graceful shutdown
-process.on('SIGINT', async () => {
-    console.log('Shutting down gracefully...');
-    if (dbInitialized) {
-        await matchDatabase.close();
-    }
-    process.exit(0);
-});
-
-process.on('SIGTERM', async () => {
-    console.log('Shutting down gracefully...');
-    if (dbInitialized) {
-        await matchDatabase.close();
-    }
-    process.exit(0);
-});
-
+// Start server with proper error handling
 app.listen(port, '0.0.0.0', () => {
-    console.log(`Server running at http://0.0.0.0:${port}`);
+    console.log(`Server is running on port ${port}`);
     console.log('Available endpoints:');
     console.log('  GET  /health - Health check with database status');
     console.log('  GET  /api/matches - Get matches (with database fallback)');
@@ -356,4 +356,29 @@ app.listen(port, '0.0.0.0', () => {
     console.log('  GET  /api/competitions - Available competitions');
     console.log('  POST /api/refresh - Force data refresh');
     console.log('  GET  /api/matches/legacy - Legacy cache fallback');
+}).on('error', (error) => {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+});
+
+// Handle termination signals gracefully
+process.on('SIGTERM', () => {
+    console.log('Received SIGTERM signal, shutting down gracefully');
+    process.exit(0);
+});
+
+process.on('SIGINT', () => {
+    console.log('Received SIGINT signal, shutting down gracefully');
+    process.exit(0);
+});
+
+// Handle uncaught errors
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught exception:', error);
+    process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled rejection at:', promise, 'reason:', reason);
+    process.exit(1);
 }); 

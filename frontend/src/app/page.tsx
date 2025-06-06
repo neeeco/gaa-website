@@ -90,43 +90,13 @@ const allIrelandSFCGroups: Group[] = [
   }
 ];
 
-function filterAllIrelandSFCMatches(matches: Match[]): Match[] {
-  if (!Array.isArray(matches)) return [];
+// Filter matches since May 17th
+function filterMatchesSinceMay17(matches: Match[]): Match[] {
+  const may17 = new Date(2025, 4, 17); // May 17, 2025
   
-  return matches.filter((match) => {
-    try {
-      if (!isValidMatch(match)) return false;
-      const compLower = String(match.competition).toLowerCase();
-      return compLower.includes('all-ireland') && 
-             compLower.includes('senior') && 
-             compLower.includes('football') &&
-             compLower.includes('championship');
-    } catch (error) {
-      console.warn('Error filtering All-Ireland SFC match:', error);
-      return false;
-    }
-  });
-}
-
-function filterSeniorChampionships(matches: Match[]): Match[] {
-  if (!Array.isArray(matches)) return [];
-  
-  return matches.filter((match) => {
-    try {
-      if (!isValidMatch(match)) return false;
-      const compLower = String(match.competition).toLowerCase();
-      
-      // Must include "senior" and "championship" but not "minor"
-      const isSenior = compLower.includes('senior');
-      const isChampionship = compLower.includes('championship');
-      const isMinor = compLower.includes('minor');
-      
-      return isSenior && isChampionship && !isMinor &&
-             (isFootballMatch(match) || isHurlingMatch(match));
-    } catch (error) {
-      console.warn('Error filtering senior championship match:', error);
-      return false;
-    }
+  return matches.filter(match => {
+    const matchDate = parseMatchDate(match);
+    return matchDate >= may17;
   });
 }
 
@@ -183,38 +153,6 @@ function parseMatchDate(match: Match | undefined | null): Date {
   }
 }
 
-// Sort results from newest to oldest (most recent first)
-function sortResultsByNewest(results: Match[]): Match[] {
-  if (!Array.isArray(results)) return [];
-  
-  try {
-    return [...results].sort((a, b) => {
-      const dateA = parseMatchDate(a);
-      const dateB = parseMatchDate(b);
-      return dateB.getTime() - dateA.getTime(); // newest first
-    });
-  } catch (error) {
-    console.warn('Error sorting results:', error);
-    return results;
-  }
-}
-
-// Sort fixtures from nearest to furthest (soonest first)
-function sortFixturesByNearest(fixtures: Match[]): Match[] {
-  if (!Array.isArray(fixtures)) return [];
-  
-  try {
-    return [...fixtures].sort((a, b) => {
-      const dateA = parseMatchDate(a);
-      const dateB = parseMatchDate(b);
-      return dateA.getTime() - dateB.getTime(); // nearest first
-    });
-  } catch (error) {
-    console.warn('Error sorting fixtures:', error);
-    return fixtures;
-  }
-}
-
 // Helper function to get the upcoming weekend dates
 function getUpcomingWeekendDates(): { saturday: Date; sunday: Date } {
   const now = new Date();
@@ -259,54 +197,82 @@ function getNextWeekendDates(): { saturday: Date; sunday: Date } {
   return { saturday, sunday };
 }
 
-// Filter matches for this weekend's fixtures
-function filterThisWeekendFixtures(matches: Match[]): Match[] {
-  const { saturday, sunday } = getUpcomingWeekendDates();
+// Group matches by weekend and day
+function groupMatchesByWeekendAndDay(matches: Match[]): {
+  grouped: Record<string, Record<string, Match[]>>;
+  weekendMap: Record<string, { saturday: Date; sunday: Date }>;
+} {
+  const grouped: Record<string, Record<string, Match[]>> = {};
+  const weekendMap: Record<string, { saturday: Date; sunday: Date }> = {};
   
-  return matches.filter(match => {
-    if (!match.isFixture) return false; // Only fixtures
-    const matchDate = parseMatchDate(match);
-    return matchDate >= saturday && matchDate <= sunday;
+  // First pass: Group matches and determine weekend dates
+  matches.forEach((match: Match) => {
+    try {
+      const matchDate = parseMatchDate(match);
+      const dayOfWeek = matchDate.getDay();
+      
+      // Only process Saturday (6) and Sunday (0) matches
+      if (dayOfWeek !== 6 && dayOfWeek !== 0) {
+        console.warn('Match not on weekend:', match);
+        return;
+      }
+      
+      // For Sunday matches, we need to find the corresponding Saturday
+      let weekendKey: string;
+      if (dayOfWeek === 0) { // Sunday
+        const saturday = new Date(matchDate);
+        saturday.setDate(matchDate.getDate() - 1);
+        weekendKey = saturday.toISOString().split('T')[0];
+      } else { // Saturday
+        weekendKey = matchDate.toISOString().split('T')[0];
+      }
+      
+      // Store weekend dates for later use in descriptions
+      if (!weekendMap[weekendKey]) {
+        const saturday = dayOfWeek === 6 ? matchDate : new Date(matchDate.getTime() - 24 * 60 * 60 * 1000);
+        const sunday = dayOfWeek === 0 ? matchDate : new Date(matchDate.getTime() + 24 * 60 * 60 * 1000);
+        weekendMap[weekendKey] = { saturday, sunday };
+      }
+      
+      // Initialize weekend group if needed
+      if (!grouped[weekendKey]) {
+        grouped[weekendKey] = {};
+      }
+      
+      // Add match to appropriate day
+      const dayName = dayOfWeek === 0 ? 'Sunday' : 'Saturday';
+      if (!grouped[weekendKey][dayName]) {
+        grouped[weekendKey][dayName] = [];
+      }
+      grouped[weekendKey][dayName].push(match);
+    } catch (error) {
+      console.warn('Error grouping match:', error);
+    }
   });
-}
-
-// Filter matches for future fixtures (beyond next weekend)
-function filterFutureFixtures(matches: Match[]): Match[] {
-  const { sunday } = getNextWeekendDates();
   
-  return matches.filter(match => {
-    if (!match.isFixture) return false; // Only fixtures
-    const matchDate = parseMatchDate(match);
-    return matchDate > sunday;
+  // Second pass: Sort matches within each day by time
+  Object.keys(grouped).forEach(weekendKey => {
+    ['Saturday', 'Sunday'].forEach(day => {
+      if (grouped[weekendKey][day]?.length > 0) {
+        grouped[weekendKey][day].sort((a, b) => {
+          const timeA = parseMatchDate(a).getTime();
+          const timeB = parseMatchDate(b).getTime();
+          return timeA - timeB;
+        });
+      } else if (grouped[weekendKey][day]) {
+        // Remove empty days
+        delete grouped[weekendKey][day];
+      }
+    });
+    
+    // Remove empty weekends
+    if (Object.keys(grouped[weekendKey]).length === 0) {
+      delete grouped[weekendKey];
+      delete weekendMap[weekendKey];
+    }
   });
-}
-
-// Filter matches for this weekend's results
-function filterThisWeekendResults(matches: Match[]): Match[] {
-  const { saturday, sunday } = getUpcomingWeekendDates();
   
-  return matches.filter(match => {
-    if (match.isFixture) return false; // Only results
-    const matchDate = parseMatchDate(match);
-    return matchDate >= saturday && matchDate <= sunday;
-  });
-}
-
-// Filter matches for last weekend's results
-function filterLastWeekendResults(matches: Match[]): Match[] {
-  const { saturday } = getUpcomingWeekendDates();
-  const lastSunday = new Date(saturday);
-  lastSunday.setDate(saturday.getDate() - 1);
-  const lastSaturday = new Date(lastSunday);
-  lastSaturday.setDate(lastSunday.getDate() - 1);
-  lastSaturday.setHours(0, 0, 0, 0);
-  lastSunday.setHours(23, 59, 59, 999);
-  
-  return matches.filter(match => {
-    if (match.isFixture) return false; // Only results
-    const matchDate = parseMatchDate(match);
-    return matchDate >= lastSaturday && matchDate <= lastSunday;
-  });
+  return { grouped, weekendMap };
 }
 
 // Helper function to add ordinal suffix
@@ -320,6 +286,408 @@ function addOrdinalSuffix(day: number): string {
   }
 }
 
+// Helper function to get simplified venue
+function getSimplifiedVenue(venue?: string | null): string {
+  if (!isValidString(venue)) return '';
+  
+  try {
+    // Special case for Croke Park
+    const venueLower = String(venue).toLowerCase();
+    if (venueLower.includes('páirc an chrócaigh') || venueLower.includes('croke park')) {
+      return 'Croke Park';
+    }
+    
+    // Split by comma and take the last meaningful part (usually county)
+    const parts = venue.split(',').map(part => part.trim());
+    
+    // Return the last non-empty part, or the whole venue if only one part
+    const lastPart = parts[parts.length - 1];
+    return lastPart || venue;
+  } catch {
+    return venue; // Return original venue if any error occurs
+  }
+}
+
+// Helper function to get date description
+function getDateDescription(match: Match): { text: string; showTime: boolean } {
+  const matchDate = parseMatchDate(match);
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  
+  // Only format time if it exists in the match data
+  const hasTime = Boolean(match.time && match.time.trim());
+  const timeStr = hasTime ? matchDate.toLocaleTimeString('en-IE', { 
+    hour: '2-digit', 
+    minute: '2-digit',
+    hour12: false 
+  }) : '';
+  
+  // Check if it's today, tomorrow, or yesterday
+  const isToday = matchDate.toDateString() === today.toDateString();
+  const isTomorrow = matchDate.toDateString() === tomorrow.toDateString();
+  const isYesterday = matchDate.toDateString() === yesterday.toDateString();
+  
+  // For today's matches
+  if (isToday) {
+    return { 
+      text: hasTime ? `Today, ${timeStr}` : 'Today', 
+      showTime: hasTime 
+    };
+  }
+  
+  // For tomorrow's matches
+  if (isTomorrow) {
+    return { 
+      text: hasTime ? `Tomorrow, ${timeStr}` : 'Tomorrow', 
+      showTime: hasTime 
+    };
+  }
+  
+  // For yesterday's matches
+  if (isYesterday) {
+    return { 
+      text: hasTime ? `Yesterday, ${timeStr}` : 'Yesterday', 
+      showTime: hasTime 
+    };
+  }
+  
+  // For all other matches, show date and time with ordinal suffix
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  
+  const dayName = dayNames[matchDate.getDay()];
+  const day = addOrdinalSuffix(matchDate.getDate());
+  const monthName = monthNames[matchDate.getMonth()];
+  
+  return { 
+    text: hasTime ? `${dayName} ${day} ${monthName}, ${timeStr}` : `${dayName} ${day} ${monthName}`,
+    showTime: hasTime 
+  };
+}
+
+// Helper function to check if a match is live
+function isMatchLive(match: Match): boolean {
+  if (match.isFixture) return false;
+  
+  const matchDate = parseMatchDate(match);
+  const now = new Date();
+  
+  // Consider a match live if it's within 2 hours of the scheduled time
+  // This is a simplified check - in reality you'd have more sophisticated live match detection
+  const timeDiff = Math.abs(now.getTime() - matchDate.getTime());
+  const twoHours = 2 * 60 * 60 * 1000;
+  
+  return timeDiff <= twoHours && match.homeScore !== '' && match.awayScore !== '';
+}
+
+// Helper function to parse GAA scores
+function parseGAAScore(score: string): number {
+  if (!score || score === 'null') return 0;
+  
+  const parts = score.split('-');
+  if (parts.length === 2) {
+    const goals = parseInt(parts[0]) || 0;
+    const points = parseInt(parts[1]) || 0;
+    return goals * 3 + points; // Goals worth 3 points each
+  }
+  
+  return parseInt(score) || 0;
+}
+
+// Helper function to get team logo
+function getTeamLogo(teamName: string | undefined | null): string {
+  if (!isValidString(teamName)) {
+    // Return a default logo if no team name is provided
+    return `data:image/svg+xml,${encodeURIComponent(`
+      <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2 L20 6 L20 14 C20 18 16 22 12 22 C8 22 4 18 4 14 L4 6 Z" 
+              fill="#228B22" 
+              stroke="#333" 
+              stroke-width="0.5"/>
+        <text x="12" y="14" 
+              font-family="Arial, sans-serif" 
+              font-size="6" 
+              font-weight="bold" 
+              text-anchor="middle" 
+              fill="#FFFFFF">GAA</text>
+      </svg>
+    `)}`;
+  }
+
+  try {
+    
+    const normalizedName = String(teamName).toLowerCase().trim();
+    
+    // County information with colors and initials
+    const countyInfo: Record<string, { initials: string; color: string; textColor?: string }> = {
+      'dublin': { initials: 'DUB', color: '#4A90E2', textColor: '#FFFFFF' }, // Sky blue
+      'kildare': { initials: 'KIL', color: '#FFFFFF', textColor: '#333333' }, // White
+      'meath': { initials: 'MEA', color: '#228B22', textColor: '#FFFFFF' }, // Green
+      'westmeath': { initials: 'WES', color: '#8B0000', textColor: '#FFFFFF' }, // Maroon
+      'wexford': { initials: 'WEX', color: '#9932CC', textColor: '#FFFFFF' }, // Purple
+      'wicklow': { initials: 'WIC', color: '#0000FF', textColor: '#FFFFFF' }, // Blue
+      'carlow': { initials: 'CAR', color: '#DC143C', textColor: '#FFFFFF' }, // Red
+      'kilkenny': { initials: 'KK', color: '#B45309', textColor: '#FFFFFF' }, // Dark gold
+      'laois': { initials: 'LAO', color: '#0000FF', textColor: '#FFFFFF' }, // Blue
+      'longford': { initials: 'LF', color: '#B45309', textColor: '#FFFFFF' }, // Dark gold
+      'louth': { initials: 'LOU', color: '#DC143C', textColor: '#FFFFFF' }, // Red
+      'offaly': { initials: 'OFF', color: '#228B22', textColor: '#FFFFFF' }, // Green
+      'cork': { initials: 'COR', color: '#DC143C', textColor: '#FFFFFF' }, // Red
+      'kerry': { initials: 'KER', color: '#228B22', textColor: '#FFFFFF' }, // Green
+      'limerick': { initials: 'LIM', color: '#228B22', textColor: '#FFFFFF' }, // Green
+      'tipperary': { initials: 'TIP', color: '#0000FF', textColor: '#FFFFFF' }, // Blue
+      'waterford': { initials: 'WAT', color: '#0000FF', textColor: '#FFFFFF' }, // Blue
+      'clare': { initials: 'CLA', color: '#B45309', textColor: '#FFFFFF' }, // Dark gold
+      'galway': { initials: 'GAL', color: '#8B0000', textColor: '#FFFFFF' }, // Maroon
+      'mayo': { initials: 'MAY', color: '#228B22', textColor: '#FFFFFF' }, // Green
+      'roscommon': { initials: 'ROS', color: '#B45309', textColor: '#FFFFFF' }, // Dark gold
+      'sligo': { initials: 'SLI', color: '#000000', textColor: '#FFFFFF' }, // Black
+      'leitrim': { initials: 'LEI', color: '#228B22', textColor: '#FFFFFF' }, // Green
+      'antrim': { initials: 'ANT', color: '#B45309', textColor: '#FFFFFF' }, // Dark gold
+      'armagh': { initials: 'ARM', color: '#FF8C00', textColor: '#FFFFFF' }, // Orange
+      'cavan': { initials: 'CAV', color: '#0000FF', textColor: '#FFFFFF' }, // Blue
+      'derry': { initials: 'DER', color: '#DC143C', textColor: '#FFFFFF' }, // Red
+      'donegal': { initials: 'DON', color: '#228B22', textColor: '#FFFFFF' }, // Green
+      'down': { initials: 'DOW', color: '#DC143C', textColor: '#FFFFFF' }, // Red
+      'fermanagh': { initials: 'FER', color: '#228B22', textColor: '#FFFFFF' }, // Green
+      'monaghan': { initials: 'MON', color: '#0000FF', textColor: '#FFFFFF' }, // Blue
+      'tyrone': { initials: 'TYR', color: '#DC143C', textColor: '#FFFFFF' }, // Red
+      'london': { initials: 'LON', color: '#228B22', textColor: '#FFFFFF' }, // Green
+      'new york': { initials: 'NY', color: '#0000FF', textColor: '#FFFFFF' }, // Blue
+    };
+
+    // Find county info
+    let info = countyInfo[normalizedName];
+    if (!info) {
+      // Partial match - check if team name contains county name
+      for (const [county, countyData] of Object.entries(countyInfo)) {
+        if (normalizedName.includes(county)) {
+          info = countyData;
+          break;
+        }
+      }
+    }
+
+    // Fallback
+    if (!info) {
+      info = { initials: 'GAA', color: '#228B22', textColor: '#FFFFFF' };
+    }
+
+    // Create SVG shield-style logo
+    const svgLogo = `
+      <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="1" dy="1" stdDeviation="1" flood-opacity="0.3"/>
+          </filter>
+        </defs>
+        <!-- Shield background -->
+        <path d="M12 2 L20 6 L20 14 C20 18 16 22 12 22 C8 22 4 18 4 14 L4 6 Z" 
+              fill="${info.color}" 
+              stroke="#333" 
+              stroke-width="0.5" 
+              filter="url(#shadow)"/>
+        <!-- Text -->
+        <text x="12" y="14" 
+              font-family="Arial, sans-serif" 
+              font-size="6" 
+              font-weight="bold" 
+              text-anchor="middle" 
+              fill="${info.textColor || '#FFFFFF'}">${info.initials}</text>
+      </svg>
+    `;
+
+    // Convert SVG to data URL
+    const encodedSvg = encodeURIComponent(svgLogo.trim());
+    return `data:image/svg+xml,${encodedSvg}`;
+  } catch (error) {
+    console.warn('Error getting team logo:', error);
+    return getTeamLogo(null); // Return default logo on error
+  }
+}
+
+// Enhanced GroupTeam interface to track head-to-head results
+interface EnhancedGroupTeam extends GroupTeam {
+  headToHead: Record<string, { won: boolean; lost: boolean; drawn: boolean }>;
+  positionSecured?: boolean; // Whether this team's position is already determined
+  securedReason?: string; // Reason why position is secured
+}
+
+// Enhanced Group interface
+interface EnhancedGroup extends Omit<Group, 'teams'> {
+  teams: EnhancedGroupTeam[];
+}
+
+// Filter All-Ireland SFC matches
+function filterAllIrelandSFCMatches(matches: Match[]): Match[] {
+  if (!Array.isArray(matches)) return [];
+  
+  return matches.filter((match) => {
+    try {
+      if (!isValidMatch(match)) return false;
+      const compLower = String(match.competition).toLowerCase();
+      return compLower.includes('all-ireland') && 
+             compLower.includes('senior') && 
+             compLower.includes('football') &&
+             compLower.includes('championship');
+    } catch (error) {
+      console.warn('Error filtering All-Ireland SFC match:', error);
+      return false;
+    }
+  });
+}
+
+// Update group data with matches
+function updateGroupDataWithMatches(groups: Group[], matches: Match[]): EnhancedGroup[] {
+  // Filter for All-Ireland SFC matches since May 17th
+  const allIrelandSFCMatches = filterAllIrelandSFCMatches(matches);
+  const matchesSinceMay17 = filterMatchesSinceMay17(allIrelandSFCMatches);
+  
+  // Create a copy of the groups with enhanced team data
+  const updatedGroups = groups.map(group => ({
+    ...group,
+    teams: group.teams.map(team => ({
+      ...team,
+      headToHead: {} as Record<string, { won: boolean; lost: boolean; drawn: boolean }>,
+      positionSecured: false,
+      securedReason: ''
+    }))
+  }));
+
+  // Initialize head-to-head records
+  updatedGroups.forEach(group => {
+    group.teams.forEach(team => {
+      group.teams.forEach(opponent => {
+        if (team.name !== opponent.name) {
+          team.headToHead[opponent.name] = { won: false, lost: false, drawn: false };
+        }
+      });
+    });
+  });
+  
+  // Process each match to update team stats and head-to-head records
+  matchesSinceMay17.forEach(match => {
+    if (match.isFixture || !match.homeScore || !match.awayScore) return;
+    
+    let homeTeamData: EnhancedGroupTeam | null = null;
+    let awayTeamData: EnhancedGroupTeam | null = null;
+    let matchGroup: EnhancedGroup | null = null;
+    
+    for (const group of updatedGroups) {
+      for (const team of group.teams) {
+        if (team.name === match.homeTeam) {
+          homeTeamData = team;
+          matchGroup = group;
+        }
+        if (team.name === match.awayTeam) {
+          awayTeamData = team;
+          matchGroup = group;
+        }
+      }
+    }
+    
+    if (!homeTeamData || !awayTeamData || !matchGroup) return;
+    
+    const homeScore = parseGAAScore(match.homeScore);
+    const awayScore = parseGAAScore(match.awayScore);
+    
+    homeTeamData.played++;
+    awayTeamData.played++;
+    
+    homeTeamData.for += homeScore;
+    awayTeamData.for += awayScore;
+    homeTeamData.against += awayScore;
+    awayTeamData.against += homeScore;
+    
+    if (homeScore > awayScore) {
+      homeTeamData.won++;
+      homeTeamData.points += 2;
+      awayTeamData.lost++;
+      homeTeamData.headToHead[awayTeamData.name].won = true;
+      awayTeamData.headToHead[homeTeamData.name].lost = true;
+    } else if (awayScore > homeScore) {
+      awayTeamData.won++;
+      awayTeamData.points += 2;
+      homeTeamData.lost++;
+      awayTeamData.headToHead[homeTeamData.name].won = true;
+      homeTeamData.headToHead[awayTeamData.name].lost = true;
+    } else {
+      homeTeamData.drawn++;
+      awayTeamData.drawn++;
+      homeTeamData.points += 1;
+      awayTeamData.points += 1;
+      homeTeamData.headToHead[awayTeamData.name].drawn = true;
+      awayTeamData.headToHead[homeTeamData.name].drawn = true;
+    }
+  });
+
+  // Sort teams and determine positions with new qualification logic
+  updatedGroups.forEach(group => {
+    group.teams.sort((a, b) => {
+      // First: Points
+      if (a.points !== b.points) return b.points - a.points;
+      
+      // Second: Head-to-head result
+      if (a.headToHead[b.name]?.won) return -1;
+      if (b.headToHead[a.name]?.won) return 1;
+      
+      // Third: Goal difference
+      const aDiff = a.for - a.against;
+      const bDiff = b.for - b.against;
+      return bDiff - aDiff;
+    });
+
+    // Check for secured positions with new rules
+    group.teams.forEach((team, index) => {
+      // Reset position secured status
+      team.positionSecured = false;
+      team.securedReason = '';
+
+      // Special case for Armagh (already qualified)
+      if (team.name === 'Armagh') {
+        const secondPlaceTeam = group.teams[1];
+        if (team.headToHead[secondPlaceTeam.name]?.won) {
+          // Check if they can't be caught by 3rd or 4th
+          const thirdPlaceTeam = group.teams[2];
+          const fourthPlaceTeam = group.teams[3];
+          const maxThirdPoints = thirdPlaceTeam.points + ((3 - thirdPlaceTeam.played) * 2);
+          const maxFourthPoints = fourthPlaceTeam.points + ((3 - fourthPlaceTeam.played) * 2);
+          
+          if (team.points > maxThirdPoints && team.points > maxFourthPoints) {
+            team.positionSecured = true;
+            team.securedReason = 'Qualified';
+          }
+        }
+      }
+
+      // For all teams - check if they've played all 3 games
+      if (team.played >= 3) {
+        team.positionSecured = true;
+        if (index === 0) {
+          team.securedReason = 'Qualified';
+        } else if (index === 1 || index === 2) {
+          team.securedReason = 'Playoff';
+        } else if (index === 3) {
+          team.securedReason = 'Relegated';
+        }
+      }
+    });
+  });
+  
+  return updatedGroups;
+}
+
+// Check if group stage is complete
+function isGroupStageComplete(groups: EnhancedGroup[]): boolean {
+  return groups.every(group => 
+    group.teams.every(team => team.played >= 3) // Each team plays each other once (3 matches total)
+  );
+}
+
+// Get week description
 function getWeekDescription(weekKey: string, weekendMap: Record<string, { saturday: Date; sunday: Date }>, matches?: Match[]): string {
   try {
     const weekend = weekendMap[weekKey];
@@ -475,542 +843,7 @@ function getWeekDescription(weekKey: string, weekendMap: Record<string, { saturd
   }
 }
 
-// Group matches by weekend and day
-function groupMatchesByWeekendAndDay(matches: Match[]): {
-  grouped: Record<string, Record<string, Match[]>>;
-  weekendMap: Record<string, { saturday: Date; sunday: Date }>;
-} {
-  const grouped: Record<string, Record<string, Match[]>> = {};
-  const weekendMap: Record<string, { saturday: Date; sunday: Date }> = {};
-  
-  // First pass: Group matches and determine weekend dates
-  matches.forEach((match: Match) => {
-    try {
-      const matchDate = parseMatchDate(match);
-      const dayOfWeek = matchDate.getDay();
-      
-      // Only process Saturday (6) and Sunday (0) matches
-      if (dayOfWeek !== 6 && dayOfWeek !== 0) {
-        console.warn('Match not on weekend:', match);
-        return;
-      }
-      
-      // For Sunday matches, we need to find the corresponding Saturday
-      let weekendKey: string;
-      if (dayOfWeek === 0) { // Sunday
-        const saturday = new Date(matchDate);
-        saturday.setDate(matchDate.getDate() - 1);
-        weekendKey = saturday.toISOString().split('T')[0];
-      } else { // Saturday
-        weekendKey = matchDate.toISOString().split('T')[0];
-      }
-      
-      // Store weekend dates for later use in descriptions
-      if (!weekendMap[weekendKey]) {
-        const saturday = dayOfWeek === 6 ? matchDate : new Date(matchDate.getTime() - 24 * 60 * 60 * 1000);
-        const sunday = dayOfWeek === 0 ? matchDate : new Date(matchDate.getTime() + 24 * 60 * 60 * 1000);
-        weekendMap[weekendKey] = { saturday, sunday };
-      }
-      
-      // Initialize weekend group if needed
-      if (!grouped[weekendKey]) {
-        grouped[weekendKey] = {};
-      }
-      
-      // Add match to appropriate day
-      const dayName = dayOfWeek === 0 ? 'Sunday' : 'Saturday';
-      if (!grouped[weekendKey][dayName]) {
-        grouped[weekendKey][dayName] = [];
-      }
-      grouped[weekendKey][dayName].push(match);
-    } catch (error) {
-      console.warn('Error grouping match:', error);
-    }
-  });
-  
-  // Second pass: Sort matches within each day by time
-  Object.keys(grouped).forEach(weekendKey => {
-    ['Saturday', 'Sunday'].forEach(day => {
-      if (grouped[weekendKey][day]?.length > 0) {
-        grouped[weekendKey][day].sort((a, b) => {
-          const timeA = parseMatchDate(a).getTime();
-          const timeB = parseMatchDate(b).getTime();
-          return timeA - timeB;
-        });
-      } else if (grouped[weekendKey][day]) {
-        // Remove empty days
-        delete grouped[weekendKey][day];
-      }
-    });
-    
-    // Remove empty weekends
-    if (Object.keys(grouped[weekendKey]).length === 0) {
-      delete grouped[weekendKey];
-      delete weekendMap[weekendKey];
-    }
-  });
-  
-  return { grouped, weekendMap };
-}
-
-function getSimplifiedVenue(venue?: string | null): string {
-  if (!isValidString(venue)) return '';
-  
-  try {
-    // Special case for Croke Park
-    const venueLower = String(venue).toLowerCase();
-    if (venueLower.includes('páirc an chrócaigh') || venueLower.includes('croke park')) {
-      return 'Croke Park';
-    }
-    
-    // Split by comma and take the last meaningful part (usually county)
-    const parts = venue.split(',').map(part => part.trim());
-    
-    // Return the last non-empty part, or the whole venue if only one part
-    const lastPart = parts[parts.length - 1];
-    return lastPart || venue;
-  } catch {
-    return venue; // Return original venue if any error occurs
-  }
-}
-
-function getDateDescription(match: Match): { text: string; showTime: boolean } {
-  const matchDate = parseMatchDate(match);
-  const today = new Date();
-  const tomorrow = new Date(today);
-  tomorrow.setDate(today.getDate() + 1);
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-  
-  // Add ordinal suffix function
-  const addOrdinalSuffix = (day: number): string => {
-    if (day > 3 && day < 21) return day + 'th';
-    switch (day % 10) {
-      case 1: return day + 'st';
-      case 2: return day + 'nd';
-      case 3: return day + 'rd';
-      default: return day + 'th';
-    }
-  };
-  
-  // Only format time if it exists in the match data
-  const hasTime = Boolean(match.time && match.time.trim());
-  const timeStr = hasTime ? matchDate.toLocaleTimeString('en-IE', { 
-    hour: '2-digit', 
-    minute: '2-digit',
-    hour12: false 
-  }) : '';
-  
-  // Check if it's today, tomorrow, or yesterday
-  const isToday = matchDate.toDateString() === today.toDateString();
-  const isTomorrow = matchDate.toDateString() === tomorrow.toDateString();
-  const isYesterday = matchDate.toDateString() === yesterday.toDateString();
-  
-  // For today's matches
-  if (isToday) {
-    return { 
-      text: hasTime ? `Today, ${timeStr}` : 'Today', 
-      showTime: hasTime 
-    };
-  }
-  
-  // For tomorrow's matches
-  if (isTomorrow) {
-    return { 
-      text: hasTime ? `Tomorrow, ${timeStr}` : 'Tomorrow', 
-      showTime: hasTime 
-    };
-  }
-  
-  // For yesterday's matches
-  if (isYesterday) {
-    return { 
-      text: hasTime ? `Yesterday, ${timeStr}` : 'Yesterday', 
-      showTime: hasTime 
-    };
-  }
-  
-  // For all other matches, show date and time with ordinal suffix
-  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  
-  const dayName = dayNames[matchDate.getDay()];
-  const day = addOrdinalSuffix(matchDate.getDate());
-  const monthName = monthNames[matchDate.getMonth()];
-  
-  return { 
-    text: hasTime ? `${dayName} ${day} ${monthName}, ${timeStr}` : `${dayName} ${day} ${monthName}`,
-    showTime: hasTime 
-  };
-}
-
-function isMatchLive(match: Match): boolean {
-  if (match.isFixture) return false;
-  
-  const matchDate = parseMatchDate(match);
-  const now = new Date();
-  
-  // Consider a match live if it's within 2 hours of the scheduled time
-  // This is a simplified check - in reality you'd have more sophisticated live match detection
-  const timeDiff = Math.abs(now.getTime() - matchDate.getTime());
-  const twoHours = 2 * 60 * 60 * 1000;
-  
-  return timeDiff <= twoHours && match.homeScore !== '' && match.awayScore !== '';
-}
-
-// Helper function to parse GAA scores (e.g., "3-18" -> total points)
-function parseGAAScore(score: string): number {
-  if (!score || score === 'null') return 0;
-  
-  const parts = score.split('-');
-  if (parts.length === 2) {
-    const goals = parseInt(parts[0]) || 0;
-    const points = parseInt(parts[1]) || 0;
-    return goals * 3 + points; // Goals worth 3 points each
-  }
-  
-  return parseInt(score) || 0;
-}
-
-// Helper function to get team logo - now using inline SVG data URLs
-function getTeamLogo(teamName: string | undefined | null): string {
-  if (!isValidString(teamName)) {
-    // Return a default logo if no team name is provided
-    return `data:image/svg+xml,${encodeURIComponent(`
-      <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-        <path d="M12 2 L20 6 L20 14 C20 18 16 22 12 22 C8 22 4 18 4 14 L4 6 Z" 
-              fill="#228B22" 
-              stroke="#333" 
-              stroke-width="0.5"/>
-        <text x="12" y="14" 
-              font-family="Arial, sans-serif" 
-              font-size="6" 
-              font-weight="bold" 
-              text-anchor="middle" 
-              fill="#FFFFFF">GAA</text>
-      </svg>
-    `)}`;
-  }
-
-  try {
-    
-    const normalizedName = String(teamName).toLowerCase().trim();
-    
-    // County information with colors and initials
-    const countyInfo: Record<string, { initials: string; color: string; textColor?: string }> = {
-      'dublin': { initials: 'DUB', color: '#4A90E2', textColor: '#FFFFFF' }, // Sky blue
-      'kildare': { initials: 'KIL', color: '#FFFFFF', textColor: '#333333' }, // White
-      'meath': { initials: 'MEA', color: '#228B22', textColor: '#FFFFFF' }, // Green
-      'westmeath': { initials: 'WES', color: '#8B0000', textColor: '#FFFFFF' }, // Maroon
-      'wexford': { initials: 'WEX', color: '#9932CC', textColor: '#FFFFFF' }, // Purple
-      'wicklow': { initials: 'WIC', color: '#0000FF', textColor: '#FFFFFF' }, // Blue
-      'carlow': { initials: 'CAR', color: '#DC143C', textColor: '#FFFFFF' }, // Red
-      'kilkenny': { initials: 'KK', color: '#B45309', textColor: '#FFFFFF' }, // Dark gold
-      'laois': { initials: 'LAO', color: '#0000FF', textColor: '#FFFFFF' }, // Blue
-      'longford': { initials: 'LF', color: '#B45309', textColor: '#FFFFFF' }, // Dark gold
-      'louth': { initials: 'LOU', color: '#DC143C', textColor: '#FFFFFF' }, // Red
-      'offaly': { initials: 'OFF', color: '#228B22', textColor: '#FFFFFF' }, // Green
-      'cork': { initials: 'COR', color: '#DC143C', textColor: '#FFFFFF' }, // Red
-      'kerry': { initials: 'KER', color: '#228B22', textColor: '#FFFFFF' }, // Green
-      'limerick': { initials: 'LIM', color: '#228B22', textColor: '#FFFFFF' }, // Green
-      'tipperary': { initials: 'TIP', color: '#0000FF', textColor: '#FFFFFF' }, // Blue
-      'waterford': { initials: 'WAT', color: '#0000FF', textColor: '#FFFFFF' }, // Blue
-      'clare': { initials: 'CLA', color: '#B45309', textColor: '#FFFFFF' }, // Dark gold
-      'galway': { initials: 'GAL', color: '#8B0000', textColor: '#FFFFFF' }, // Maroon
-      'mayo': { initials: 'MAY', color: '#228B22', textColor: '#FFFFFF' }, // Green
-      'roscommon': { initials: 'ROS', color: '#B45309', textColor: '#FFFFFF' }, // Dark gold
-      'sligo': { initials: 'SLI', color: '#000000', textColor: '#FFFFFF' }, // Black
-      'leitrim': { initials: 'LEI', color: '#228B22', textColor: '#FFFFFF' }, // Green
-      'antrim': { initials: 'ANT', color: '#B45309', textColor: '#FFFFFF' }, // Dark gold
-      'armagh': { initials: 'ARM', color: '#FF8C00', textColor: '#FFFFFF' }, // Orange
-      'cavan': { initials: 'CAV', color: '#0000FF', textColor: '#FFFFFF' }, // Blue
-      'derry': { initials: 'DER', color: '#DC143C', textColor: '#FFFFFF' }, // Red
-      'donegal': { initials: 'DON', color: '#228B22', textColor: '#FFFFFF' }, // Green
-      'down': { initials: 'DOW', color: '#DC143C', textColor: '#FFFFFF' }, // Red
-      'fermanagh': { initials: 'FER', color: '#228B22', textColor: '#FFFFFF' }, // Green
-      'monaghan': { initials: 'MON', color: '#0000FF', textColor: '#FFFFFF' }, // Blue
-      'tyrone': { initials: 'TYR', color: '#DC143C', textColor: '#FFFFFF' }, // Red
-      'london': { initials: 'LON', color: '#228B22', textColor: '#FFFFFF' }, // Green
-      'new york': { initials: 'NY', color: '#0000FF', textColor: '#FFFFFF' }, // Blue
-    };
-
-    // Find county info
-    let info = countyInfo[normalizedName];
-    if (!info) {
-      // Partial match - check if team name contains county name
-      for (const [county, countyData] of Object.entries(countyInfo)) {
-        if (normalizedName.includes(county)) {
-          info = countyData;
-          break;
-        }
-      }
-    }
-
-    // Fallback
-    if (!info) {
-      info = { initials: 'GAA', color: '#228B22', textColor: '#FFFFFF' };
-    }
-
-    // Create SVG shield-style logo
-    const svgLogo = `
-      <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-            <feDropShadow dx="1" dy="1" stdDeviation="1" flood-opacity="0.3"/>
-          </filter>
-        </defs>
-        <!-- Shield background -->
-        <path d="M12 2 L20 6 L20 14 C20 18 16 22 12 22 C8 22 4 18 4 14 L4 6 Z" 
-              fill="${info.color}" 
-              stroke="#333" 
-              stroke-width="0.5" 
-              filter="url(#shadow)"/>
-        <!-- Text -->
-        <text x="12" y="14" 
-              font-family="Arial, sans-serif" 
-              font-size="6" 
-              font-weight="bold" 
-              text-anchor="middle" 
-              fill="${info.textColor || '#FFFFFF'}">${info.initials}</text>
-      </svg>
-    `;
-
-    // Convert SVG to data URL
-    const encodedSvg = encodeURIComponent(svgLogo.trim());
-    return `data:image/svg+xml,${encodedSvg}`;
-  } catch (error) {
-    console.warn('Error getting team logo:', error);
-    return getTeamLogo(null); // Return default logo on error
-  }
-}
-
-function MatchRow({ match }: { match: Match }) {
-  const isLive = isMatchLive(match);
-  const venue = getSimplifiedVenue(match.venue);
-  const { text: dateDesc } = getDateDescription(match);
-  const homeTeamLogo = getTeamLogo(match.homeTeam);
-  const awayTeamLogo = getTeamLogo(match.awayTeam);
-
-  return (
-    <div className="bg-gray-50 hover:bg-gray-100 transition-colors p-4 rounded-lg">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-8">
-          {/* Home Team */}
-          <div className="flex items-center min-w-[140px]">
-            <div className="w-8 h-8 relative">
-              <Image 
-                src={homeTeamLogo} 
-                alt={`${match.homeTeam} logo`}
-                width={32}
-                height={32}
-                className="object-contain"
-              />
-            </div>
-            <span className="ml-2 font-medium text-gray-900">{match.homeTeam}</span>
-          </div>
-          
-          {/* Score/VS */}
-          <div className="text-center min-w-[100px] font-medium">
-            {match.isFixture ? (
-              <span className="text-gray-600">vs</span>
-            ) : (
-              <span className={`${isLive ? 'text-red-600' : 'text-gray-900'}`}>
-                {match.homeScore} - {match.awayScore}
-              </span>
-            )}
-          </div>
-          
-          {/* Away Team */}
-          <div className="flex items-center min-w-[140px]">
-            <div className="w-8 h-8 relative">
-              <Image 
-                src={awayTeamLogo} 
-                alt={`${match.awayTeam} logo`}
-                width={32}
-                height={32}
-                className="object-contain"
-              />
-            </div>
-            <span className="ml-2 font-medium text-gray-900">{match.awayTeam}</span>
-          </div>
-        </div>
-        
-        {/* Date, Time, Venue and Live Status */}
-        <div className="flex items-center space-x-6">
-          <div className="text-right text-sm text-gray-600 min-w-[100px]">
-            {venue}
-          </div>
-          <div className="text-right text-sm text-gray-900 font-medium min-w-[140px]">
-            {dateDesc}
-          </div>
-          {isLive && (
-            <span className="bg-red-500 text-white text-xs px-2 py-1 rounded font-bold">
-              LIVE
-            </span>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Enhanced GroupTeam interface to track head-to-head results
-interface EnhancedGroupTeam extends GroupTeam {
-  headToHead: Record<string, { won: boolean; lost: boolean; drawn: boolean }>;
-  positionSecured?: boolean; // Whether this team's position is already determined
-  securedReason?: string; // Reason why position is secured
-}
-
-// Enhanced Group interface
-interface EnhancedGroup extends Omit<Group, 'teams'> {
-  teams: EnhancedGroupTeam[];
-}
-
-function updateGroupDataWithMatches(groups: Group[], matches: Match[]): EnhancedGroup[] {
-  // Filter for All-Ireland SFC matches since May 17th
-  const allIrelandSFCMatches = filterAllIrelandSFCMatches(matches);
-  const matchesSinceMay17 = filterMatchesSinceMay17(allIrelandSFCMatches);
-  
-  // Create a copy of the groups with enhanced team data
-  const updatedGroups = groups.map(group => ({
-    ...group,
-    teams: group.teams.map(team => ({
-      ...team,
-      headToHead: {} as Record<string, { won: boolean; lost: boolean; drawn: boolean }>,
-      positionSecured: false,
-      securedReason: ''
-    }))
-  }));
-
-  // Initialize head-to-head records
-  updatedGroups.forEach(group => {
-    group.teams.forEach(team => {
-      group.teams.forEach(opponent => {
-        if (team.name !== opponent.name) {
-          team.headToHead[opponent.name] = { won: false, lost: false, drawn: false };
-        }
-      });
-    });
-  });
-  
-  // Process each match to update team stats and head-to-head records
-  matchesSinceMay17.forEach(match => {
-    if (match.isFixture || !match.homeScore || !match.awayScore) return;
-    
-    let homeTeamData: EnhancedGroupTeam | null = null;
-    let awayTeamData: EnhancedGroupTeam | null = null;
-    let matchGroup: EnhancedGroup | null = null;
-    
-    for (const group of updatedGroups) {
-      for (const team of group.teams) {
-        if (team.name === match.homeTeam) {
-          homeTeamData = team;
-          matchGroup = group;
-        }
-        if (team.name === match.awayTeam) {
-          awayTeamData = team;
-          matchGroup = group;
-        }
-      }
-    }
-    
-    if (!homeTeamData || !awayTeamData || !matchGroup) return;
-    
-    const homeScore = parseGAAScore(match.homeScore);
-    const awayScore = parseGAAScore(match.awayScore);
-    
-    homeTeamData.played++;
-    awayTeamData.played++;
-    
-    homeTeamData.for += homeScore;
-    awayTeamData.for += awayScore;
-    homeTeamData.against += awayScore;
-    awayTeamData.against += homeScore;
-    
-    if (homeScore > awayScore) {
-      homeTeamData.won++;
-      homeTeamData.points += 2;
-      awayTeamData.lost++;
-      homeTeamData.headToHead[awayTeamData.name].won = true;
-      awayTeamData.headToHead[homeTeamData.name].lost = true;
-    } else if (awayScore > homeScore) {
-      awayTeamData.won++;
-      awayTeamData.points += 2;
-      homeTeamData.lost++;
-      awayTeamData.headToHead[homeTeamData.name].won = true;
-      homeTeamData.headToHead[awayTeamData.name].lost = true;
-    } else {
-      homeTeamData.drawn++;
-      awayTeamData.drawn++;
-      homeTeamData.points += 1;
-      awayTeamData.points += 1;
-      homeTeamData.headToHead[awayTeamData.name].drawn = true;
-      awayTeamData.headToHead[homeTeamData.name].drawn = true;
-    }
-  });
-
-  // Sort teams and determine positions with new qualification logic
-  updatedGroups.forEach(group => {
-    group.teams.sort((a, b) => {
-      // First: Points
-      if (a.points !== b.points) return b.points - a.points;
-      
-      // Second: Head-to-head result
-      if (a.headToHead[b.name]?.won) return -1;
-      if (b.headToHead[a.name]?.won) return 1;
-      
-      // Third: Goal difference
-      const aDiff = a.for - a.against;
-      const bDiff = b.for - b.against;
-      return bDiff - aDiff;
-    });
-
-    // Check for secured positions with new rules
-    group.teams.forEach((team, index) => {
-      // Reset position secured status
-      team.positionSecured = false;
-      team.securedReason = '';
-
-      // Special case for Armagh (already qualified)
-      if (team.name === 'Armagh') {
-        const secondPlaceTeam = group.teams[1];
-        if (team.headToHead[secondPlaceTeam.name]?.won) {
-          // Check if they can't be caught by 3rd or 4th
-          const thirdPlaceTeam = group.teams[2];
-          const fourthPlaceTeam = group.teams[3];
-          const maxThirdPoints = thirdPlaceTeam.points + ((3 - thirdPlaceTeam.played) * 2);
-          const maxFourthPoints = fourthPlaceTeam.points + ((3 - fourthPlaceTeam.played) * 2);
-          
-          if (team.points > maxThirdPoints && team.points > maxFourthPoints) {
-            team.positionSecured = true;
-            team.securedReason = 'Qualified';
-          }
-        }
-      }
-
-      // For all teams - check if they've played all 3 games
-      if (team.played >= 3) {
-        team.positionSecured = true;
-        if (index === 0) {
-          team.securedReason = 'Qualified';
-        } else if (index === 1 || index === 2) {
-          team.securedReason = 'Playoff';
-        } else if (index === 3) {
-          team.securedReason = 'Relegated';
-        }
-      }
-    });
-  });
-  
-  return updatedGroups;
-}
-
-function isGroupStageComplete(groups: EnhancedGroup[]): boolean {
-  return groups.every(group => 
-    group.teams.every(team => team.played >= 3) // Each team plays each other once (3 matches total)
-  );
-}
-
+// Group table component
 function GroupTable({ group }: { group: EnhancedGroup }) {
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden h-full">
@@ -1100,92 +933,78 @@ function GroupTable({ group }: { group: EnhancedGroup }) {
   );
 }
 
-// Filter matches since May 17th (group stage started 1 week earlier)
-function filterMatchesSinceMay17(matches: Match[]): Match[] {
-  const may17 = new Date(2025, 4, 17); // May 17, 2025
-  
-  return matches.filter(match => {
-    const matchDate = parseMatchDate(match);
-    return matchDate >= may17;
-  });
+// Component implementations
+function MatchRow({ match }: { match: Match }) {
+  const isLive = isMatchLive(match);
+  const venue = getSimplifiedVenue(match.venue);
+  const { text: dateDesc } = getDateDescription(match);
+  const homeTeamLogo = getTeamLogo(match.homeTeam);
+  const awayTeamLogo = getTeamLogo(match.awayTeam);
+
+  return (
+    <div className="bg-gray-50 hover:bg-gray-100 transition-colors p-4 rounded-lg">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-8">
+          {/* Home Team */}
+          <div className="flex items-center min-w-[140px]">
+            <div className="w-8 h-8 relative">
+              <Image 
+                src={homeTeamLogo} 
+                alt={`${match.homeTeam} logo`}
+                width={32}
+                height={32}
+                className="object-contain"
+              />
+            </div>
+            <span className="ml-2 font-medium text-gray-900">{match.homeTeam}</span>
+          </div>
+          
+          {/* Score/VS */}
+          <div className="text-center min-w-[100px] font-medium">
+            {match.isFixture ? (
+              <span className="text-gray-600">vs</span>
+            ) : (
+              <span className={`${isLive ? 'text-red-600' : 'text-gray-900'}`}>
+                {match.homeScore} - {match.awayScore}
+              </span>
+            )}
+          </div>
+          
+          {/* Away Team */}
+          <div className="flex items-center min-w-[140px]">
+            <div className="w-8 h-8 relative">
+              <Image 
+                src={awayTeamLogo} 
+                alt={`${match.awayTeam} logo`}
+                width={32}
+                height={32}
+                className="object-contain"
+              />
+            </div>
+            <span className="ml-2 font-medium text-gray-900">{match.awayTeam}</span>
+          </div>
+        </div>
+        
+        {/* Date, Time, Venue and Live Status */}
+        <div className="flex items-center space-x-6">
+          <div className="text-right text-sm text-gray-600 min-w-[100px]">
+            {venue}
+          </div>
+          <div className="text-right text-sm text-gray-900 font-medium min-w-[140px]">
+            {dateDesc}
+          </div>
+          {isLive && (
+            <span className="bg-red-500 text-white text-xs px-2 py-1 rounded font-bold">
+              LIVE
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
-// Get latest senior championship results with intelligent fallback that looks back in time
-function getLatestResults(matches: Match[] | undefined | null, sport: 'football' | 'hurling'): { results: Match[]; weekLabel: string } {
-  if (!matches || !Array.isArray(matches)) {
-    console.warn('Invalid matches array passed to getLatestResults');
-    return { results: [], weekLabel: "No Recent Results" };
-  }
-
-  try {
-    // Filter to only senior championships first
-    const seniorMatches = matches.filter((match) => {
-      try {
-        if (!isValidMatch(match)) return false;
-        const compLower = String(match.competition).toLowerCase();
-        return compLower.includes('senior championship');
-      } catch (error) {
-        console.warn('Error filtering senior match:', error);
-        return false;
-      }
-    });
-    
-    // Then filter by sport
-    const sportMatches = seniorMatches.filter(match => {
-      try {
-        if (!isValidMatch(match)) return false;
-        return sport === 'hurling' ? isHurlingMatch(match) : isFootballMatch(match);
-      } catch (error) {
-        console.warn('Error filtering sport match:', error);
-        return false;
-      }
-    });
-    
-    // Try this weekend first
-    const thisWeekendResults = filterThisWeekendResults(sportMatches);
-    if (thisWeekendResults.length > 0) {
-      return { results: thisWeekendResults, weekLabel: "This Weekend's Results" };
-    }
-    
-    // Try last weekend
-    const lastWeekendResults = filterLastWeekendResults(sportMatches);
-    if (lastWeekendResults.length > 0) {
-      return { results: lastWeekendResults, weekLabel: "Last Weekend's Results" };
-    }
-    
-    // Keep looking back further in time for senior championship results
-    let weekendsBack = 2; // Start from 2 weekends back since we already checked current and last
-    const maxWeekendsBack = 52; // Look back up to 1 year
-    
-    while (weekendsBack <= maxWeekendsBack) {
-      const lastSunday = new Date(getUpcomingWeekendDates().saturday);
-      lastSunday.setDate(lastSunday.getDate() - (weekendsBack * 7) - 1);
-      const lastSaturday = new Date(lastSunday);
-      lastSaturday.setDate(lastSunday.getDate() - 1);
-      lastSaturday.setHours(0, 0, 0, 0);
-      lastSunday.setHours(23, 59, 59, 999);
-      
-      const weekendResults = sportMatches.filter(match => {
-        if (match.isFixture) return false;
-        const matchDate = parseMatchDate(match);
-        return matchDate >= lastSaturday && matchDate <= lastSunday;
-      });
-      
-      if (weekendResults.length > 0) {
-        const weekendsAgoText = weekendsBack === 1 ? "1 weekend ago" : `${weekendsBack} weekends ago`;
-        return { results: weekendResults, weekLabel: `Latest Results (${weekendsAgoText})` };
-      }
-      
-      weekendsBack++;
-    }
-  } catch (error) {
-    console.error('Error in getLatestResults:', error);
-    return { results: [], weekLabel: "Error Loading Results" };
-  }
-  
-  return { results: [], weekLabel: "No Recent Results" };
-}
-
+// Main component
 export default function HomePage() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);

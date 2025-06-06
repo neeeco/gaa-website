@@ -336,65 +336,6 @@ function getCurrentWeekRange(): { start: Date; end: Date } {
   return { start, end };
 }
 
-// Helper function to get start and end of last week
-function getLastWeekRange(): { start: Date; end: Date } {
-  const currentWeek = getCurrentWeekRange();
-  
-  const end = new Date(currentWeek.start);
-  end.setSeconds(end.getSeconds() - 1); // Set to Sunday 23:59:59
-  
-  const start = new Date(end);
-  start.setDate(end.getDate() - 6);
-  start.setHours(0, 0, 0, 0); // Set to Monday 00:00
-  
-  return { start, end };
-}
-
-// Helper function to get start and end of next week
-function getNextWeekRange(): { start: Date; end: Date } {
-  const currentWeek = getCurrentWeekRange();
-  
-  const start = new Date(currentWeek.end);
-  start.setSeconds(start.getSeconds() + 1); // Set to next Monday 00:00
-  start.setHours(0, 0, 0, 0);
-  
-  const end = new Date(start);
-  end.setDate(start.getDate() + 6);
-  end.setHours(23, 59, 59, 999); // Set to Sunday 23:59:59.999
-  
-  return { start, end };
-}
-
-// Helper function to get week range N weeks ago
-function getWeekRangeNWeeksAgo(weeksAgo: number): { start: Date; end: Date } {
-  const currentWeek = getCurrentWeekRange();
-  
-  const end = new Date(currentWeek.start);
-  end.setDate(currentWeek.start.getDate() - 1 - (7 * (weeksAgo - 1)));
-  end.setHours(23, 59, 59, 999);
-  
-  const start = new Date(end);
-  start.setDate(end.getDate() - 6);
-  start.setHours(0, 0, 0, 0);
-  
-  return { start, end };
-}
-
-// Helper function to get week range N weeks in the future
-function getWeekRangeNWeeksAhead(weeksAhead: number): { start: Date; end: Date } {
-  const currentWeek = getCurrentWeekRange();
-  
-  const start = new Date(currentWeek.end);
-  start.setDate(currentWeek.end.getDate() + 1 + (7 * (weeksAhead - 1)));
-  start.setHours(0, 0, 0, 0);
-  
-  const end = new Date(start);
-  end.setDate(start.getDate() + 6);
-  end.setHours(23, 59, 59, 999);
-  
-  return { start, end };
-}
-
 // Helper function to get the upcoming weekend dates
 function getUpcomingWeekendDates(): { saturday: Date; sunday: Date } {
   const now = new Date();
@@ -442,17 +383,6 @@ function getNextWeekendDates(): { saturday: Date; sunday: Date } {
 // Filter matches for this weekend's fixtures
 function filterThisWeekendFixtures(matches: Match[]): Match[] {
   const { saturday, sunday } = getUpcomingWeekendDates();
-  
-  return matches.filter(match => {
-    if (!match.isFixture) return false; // Only fixtures
-    const matchDate = parseMatchDate(match);
-    return matchDate >= saturday && matchDate <= sunday;
-  });
-}
-
-// Filter matches for next weekend's fixtures
-function filterNextWeekendFixtures(matches: Match[]): Match[] {
-  const { saturday, sunday } = getNextWeekendDates();
   
   return matches.filter(match => {
     if (!match.isFixture) return false; // Only fixtures
@@ -1045,24 +975,6 @@ function MatchRow({ match }: { match: Match }) {
   );
 }
 
-function CompetitionSection({ competition, matches }: { competition: string; matches: Match[] }) {
-  return (
-    <div className="bg-gray-50 rounded-lg p-4">
-      <h3 className="font-semibold text-gray-900 mb-3 text-sm">
-        {competition}
-      </h3>
-      <div className="space-y-2">
-        {matches.map((match, index) => (
-          <MatchRow 
-            key={`${match.homeTeam}-${match.awayTeam}-${match.date}-${match.time || ''}-${index}`} 
-            match={match} 
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 // Enhanced GroupTeam interface to track head-to-head results
 interface EnhancedGroupTeam extends GroupTeam {
   headToHead: Record<string, { won: boolean; lost: boolean; drawn: boolean }>;
@@ -1249,7 +1161,7 @@ function GroupTable({ group }: { group: EnhancedGroup }) {
           <tbody>
             {group.teams.map((team, index) => {
               let statusClass = '';
-              let statusText = team.securedReason || '';
+              const statusText = team.securedReason || '';
               let rowClass = '';
               
               if (index === 0) {
@@ -1511,7 +1423,7 @@ export default function HomePage() {
   }, []);
 
   // Get latest senior championship results with intelligent fallback
-  const { results: latestResults, weekLabel } = useMemo(() => {
+  const { results: latestResults } = useMemo(() => {
     console.log('Getting latest results for sport:', activeSport);
     return getLatestResults(matches, activeSport);
   }, [matches, activeSport]);
@@ -1547,11 +1459,6 @@ export default function HomePage() {
     console.log('Grouping future fixtures');
     return groupSeniorChampionships(futureFixtures);
   }, [futureFixtures]);
-
-  // Get current sport data
-  const currentLatestResults = activeSport === 'football' ? groupedLatestResults.football : groupedLatestResults.hurling;
-  const currentUpcomingFixtures = activeSport === 'football' ? groupedUpcomingFixtures.football : groupedUpcomingFixtures.hurling;
-  const currentFutureFixtures = activeSport === 'football' ? groupedFutureFixtures.football : groupedFutureFixtures.hurling;
 
   // Update group data with real match results since May 17th
   const updatedGroups = useMemo(() => {

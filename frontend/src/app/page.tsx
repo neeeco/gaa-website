@@ -659,10 +659,33 @@ function getWeekDescription(weekKey: string, weekendMap: Record<string, { saturd
       weekend.sunday.getDate() === 15;
 
     if (isFinalGroupRound) {
+      // Check if there are any football matches this weekend
+      const hasFootballMatches = matches?.some(match => {
+        const compLower = match.competition?.toLowerCase() || '';
+        return compLower.includes('all-ireland') && 
+               compLower.includes('senior') && 
+               isFootballMatch(match);
+      });
+
+      if (hasFootballMatches) {
+        const saturdayDate = addOrdinalSuffix(weekend.saturday.getDate());
+        const sundayDate = addOrdinalSuffix(weekend.sunday.getDate());
+        const month = weekend.saturday.toLocaleDateString('en-IE', { month: 'long' });
+        return `Final Group Round (${month} ${saturdayDate}/${sundayDate})`;
+      }
+    }
+
+    // Check if it's Provincial Finals weekend (June 7th/8th)
+    const isProvincialFinalsWeekend = 
+      weekend.saturday.getMonth() === 5 && // June is month 5
+      weekend.saturday.getDate() === 7 &&
+      weekend.sunday.getDate() === 8;
+
+    if (isProvincialFinalsWeekend) {
       const saturdayDate = addOrdinalSuffix(weekend.saturday.getDate());
       const sundayDate = addOrdinalSuffix(weekend.sunday.getDate());
       const month = weekend.saturday.toLocaleDateString('en-IE', { month: 'long' });
-      return `Final Group Round (${month} ${saturdayDate}/${sundayDate})`;
+      return `Provincial Finals (${month} ${saturdayDate}/${sundayDate})`;
     }
 
     // Check if it's Round 2 weekend (May 31st/June 1st)
@@ -1137,7 +1160,7 @@ export default function HomePage() {
           <div className="flex items-center justify-between h-16">
             <div>
             <h1 className="text-2xl font-audiowide text-gray-900">
-              gaa<span className="text-gray-500">Today</span>
+              gaa<span className="text-orange-500">Today</span>
             </h1>
               <p className="text-xs text-gray-500 -mt-1 font-medium">ALL DAY, ALL-IRELAND.</p>
             </div>
@@ -1354,6 +1377,14 @@ export default function HomePage() {
           </div>
         )}
       </main>
+
+      {/* Disclaimer */}
+      <footer className="max-w-6xl mx-auto px-4 py-6 border-t border-gray-200">
+        <p className="text-sm text-gray-500 text-center">
+          This website is not affiliated with, endorsed by, or officially connected with the GAA or any official GAA bodies. 
+          It is an independent fan project created to provide easy access to publicly available GAA match information.
+        </p>
+      </footer>
     </div>
   );
 }

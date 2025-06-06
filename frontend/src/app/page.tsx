@@ -1179,7 +1179,7 @@ export default function HomePage() {
             <h1 className="text-2xl font-audiowide text-gray-900">
               gaa<span className="text-orange-500">Today</span>
             </h1>
-              <p className="text-xs text-gray-500 -mt-1 font-medium">ALL DAY, ALL-IRELAND.</p>
+              <p className="text-xs text-gray-500 -mt-1 font-medium">ALL-IRELAND, ALL DAY.</p>
             </div>
             <div className="text-sm text-gray-600">
               {lastUpdated ? `Last Updated: ${lastUpdated}` : 'Loading...'}

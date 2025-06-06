@@ -946,7 +946,8 @@ function MatchRow({ match }: { match: Match }) {
         {/* Match Info */}
         <div className="flex items-center gap-3 flex-1 min-w-0">
           {/* Home Team */}
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-2 min-w-[180px] justify-end">
+            <span className="font-medium text-gray-900 truncate text-sm">{match.homeTeam}</span>
             <div className="w-6 h-6 flex-shrink-0">
               <Image 
                 src={homeTeamLogo} 
@@ -956,18 +957,17 @@ function MatchRow({ match }: { match: Match }) {
                 className="object-contain"
               />
             </div>
-            <span className="font-medium text-gray-900 truncate text-sm">{match.homeTeam}</span>
           </div>
           
           {/* Score/VS */}
-          <div className="flex-shrink-0">
-            <span className={`${isLive ? 'text-red-600' : 'text-gray-900'} font-medium text-sm`}>
-              {match.isFixture ? 'v' : `${match.homeScore}-${match.awayScore}`}
+          <div className="flex-shrink-0 min-w-[60px] text-center">
+            <span className={`${isLive ? 'text-red-600' : 'text-gray-900'} font-semibold text-sm px-3 py-1 ${!match.isFixture ? 'bg-white rounded shadow-sm' : ''}`}>
+              {match.isFixture ? 'v' : `${match.homeScore} - ${match.awayScore}`}
             </span>
           </div>
           
           {/* Away Team */}
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-2 min-w-[180px]">
             <div className="w-6 h-6 flex-shrink-0">
               <Image 
                 src={awayTeamLogo} 

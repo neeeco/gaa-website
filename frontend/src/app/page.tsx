@@ -990,16 +990,20 @@ function MatchRow({ match }: { match: Match }) {
           )}
         </div>
 
-        {/* Match Details - Now centered below and only shown for fixtures */}
+        {/* Match Details - Time/Date centered and venue on right for fixtures */}
         {match.isFixture && (
-          <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
-            {venue && (
-              <>
-                <span>{venue}</span>
-                <span className="text-gray-300">•</span>
-              </>
-            )}
-            <span>{dateDesc}</span>
+          <div className="flex items-center justify-between text-xs text-gray-500 mt-1">
+            <div className="w-24"></div> {/* Spacer for alignment */}
+            <div>
+              {match.time ? (
+                <span className="font-medium">{match.time}</span>
+              ) : (
+                <span className="font-medium">{match.date}</span>
+              )}
+            </div>
+            <div className="w-24 text-right truncate">
+              {venue && <span>{venue}</span>}
+            </div>
           </div>
         )}
       </div>

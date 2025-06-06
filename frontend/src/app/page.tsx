@@ -942,59 +942,66 @@ function MatchRow({ match }: { match: Match }) {
 
   return (
     <div className="bg-gray-50 hover:bg-gray-100 transition-colors p-3 rounded-lg">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-2">
         {/* Match Info */}
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          {/* Home Team */}
-          <div className="flex items-center gap-2 min-w-[180px] justify-end">
-            <span className="font-medium text-gray-900 truncate text-sm">{match.homeTeam}</span>
-            <div className="w-6 h-6 flex-shrink-0">
-              <Image 
-                src={homeTeamLogo} 
-                alt={`${match.homeTeam} logo`}
-                width={24}
-                height={24}
-                className="object-contain"
-              />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            {/* Home Team */}
+            <div className="flex items-center gap-2 min-w-[180px] justify-end">
+              <span className="font-medium text-gray-900 truncate text-sm">{match.homeTeam}</span>
+              <div className="w-6 h-6 flex-shrink-0">
+                <Image 
+                  src={homeTeamLogo} 
+                  alt={`${match.homeTeam} logo`}
+                  width={24}
+                  height={24}
+                  className="object-contain"
+                />
+              </div>
+            </div>
+            
+            {/* Score/VS */}
+            <div className="flex-shrink-0 min-w-[60px] text-center">
+              <span className={`${isLive ? 'text-red-600' : 'text-gray-900'} font-semibold text-sm px-3 py-1 ${!match.isFixture ? 'bg-white rounded shadow-sm' : ''}`}>
+                {match.isFixture ? 'v' : `${match.homeScore} - ${match.awayScore}`}
+              </span>
+            </div>
+            
+            {/* Away Team */}
+            <div className="flex items-center gap-2 min-w-[180px]">
+              <div className="w-6 h-6 flex-shrink-0">
+                <Image 
+                  src={awayTeamLogo} 
+                  alt={`${match.awayTeam} logo`}
+                  width={24}
+                  height={24}
+                  className="object-contain"
+                />
+              </div>
+              <span className="font-medium text-gray-900 truncate text-sm">{match.awayTeam}</span>
             </div>
           </div>
-          
-          {/* Score/VS */}
-          <div className="flex-shrink-0 min-w-[60px] text-center">
-            <span className={`${isLive ? 'text-red-600' : 'text-gray-900'} font-semibold text-sm px-3 py-1 ${!match.isFixture ? 'bg-white rounded shadow-sm' : ''}`}>
-              {match.isFixture ? 'v' : `${match.homeScore} - ${match.awayScore}`}
-            </span>
-          </div>
-          
-          {/* Away Team */}
-          <div className="flex items-center gap-2 min-w-[180px]">
-            <div className="w-6 h-6 flex-shrink-0">
-              <Image 
-                src={awayTeamLogo} 
-                alt={`${match.awayTeam} logo`}
-                width={24}
-                height={24}
-                className="object-contain"
-              />
-            </div>
-            <span className="font-medium text-gray-900 truncate text-sm">{match.awayTeam}</span>
-          </div>
-        </div>
 
-        {/* Match Details */}
-        <div className="flex items-center gap-3 flex-shrink-0 ml-3">
-          <div className="hidden sm:block text-sm text-gray-600 truncate">
-            {venue}
-          </div>
-          <div className="text-sm text-gray-900 font-medium whitespace-nowrap">
-            {dateDesc}
-          </div>
+          {/* Live Badge - Moved outside of details */}
           {isLive && (
-            <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded font-bold">
+            <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded font-bold ml-2">
               LIVE
             </span>
           )}
         </div>
+
+        {/* Match Details - Now centered below and only shown for fixtures */}
+        {match.isFixture && (
+          <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
+            {venue && (
+              <>
+                <span>{venue}</span>
+                <span className="text-gray-300">•</span>
+              </>
+            )}
+            <span>{dateDesc}</span>
+          </div>
+        )}
       </div>
     </div>
   );

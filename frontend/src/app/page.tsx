@@ -179,24 +179,6 @@ function getUpcomingWeekendDates(): { saturday: Date; sunday: Date } {
   return { saturday, sunday };
 }
 
-// Helper function to get next weekend dates
-function getNextWeekendDates(): { saturday: Date; sunday: Date } {
-  const { saturday, sunday } = getUpcomingWeekendDates();
-  const now = new Date();
-  const irishDate = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Dublin' }));
-  
-  // If we're already in the weekend, return next weekend
-  if (irishDate >= saturday) {
-    const nextSaturday = new Date(saturday);
-    nextSaturday.setDate(saturday.getDate() + 7);
-    const nextSunday = new Date(sunday);
-    nextSunday.setDate(sunday.getDate() + 7);
-    return { saturday: nextSaturday, sunday: nextSunday };
-  }
-  
-  return { saturday, sunday };
-}
-
 // Group matches by weekend and day
 function groupMatchesByWeekendAndDay(matches: Match[]): {
   grouped: Record<string, Record<string, Match[]>>;

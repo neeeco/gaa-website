@@ -215,101 +215,6 @@ function sortFixturesByNearest(fixtures: Match[]): Match[] {
   }
 }
 
-function groupSeniorChampionships(matches: Match[]) {
-  if (!Array.isArray(matches)) {
-    console.warn('Invalid matches array passed to groupSeniorChampionships');
-    return {
-      hurling: {},
-      football: {},
-    };
-  }
-
-  const groups = {
-    hurling: {} as Record<string, Match[]>,
-    football: {} as Record<string, Match[]>,
-  };
-
-  matches.forEach((match) => {
-    try {
-      if (!match?.competition) return;
-      const compLower = match.competition.toLowerCase();
-      let sport: 'hurling' | 'football';
-      
-      // More comprehensive sport detection
-      if (compLower.includes('hurling') || 
-          compLower.includes('camán') || 
-          compLower.includes('iomaint') ||
-          compLower.includes('camogie')) {
-        sport = 'hurling';
-      } else if (compLower.includes('football') || 
-                 compLower.includes('peil') ||
-                 compLower.includes('ladies football') ||
-                 compLower.includes('gaelic football')) {
-        sport = 'football';
-      } else {
-        // If sport is unclear, make an educated guess based on competition patterns
-        // Some competitions might not explicitly mention the sport
-        if (compLower.includes('minor') || compLower.includes('under') || compLower.includes('u-')) {
-          // For age-grade competitions, we'll need to check team names or default to football
-          sport = 'football'; // Default to football for unclear cases
-        } else {
-          return; // Skip if we can't determine the sport
-        }
-      }
-
-      const competition = match.competition;
-      if (!groups[sport][competition]) {
-        groups[sport][competition] = [];
-      }
-      groups[sport][competition].push(match);
-    } catch (error) {
-      console.warn('Error processing match in groupSeniorChampionships:', error);
-      return; // Skip this match if there's an error
-    }
-  });
-
-  // Sort matches within each competition group
-  Object.keys(groups.hurling).forEach(competition => {
-    const matches = groups.hurling[competition];
-    const hasResults = matches.some(m => !m.isFixture);
-    const hasFixtures = matches.some(m => m.isFixture);
-    
-    if (hasResults && hasFixtures) {
-      // Mixed group - separate and sort each type
-      const results = sortResultsByNewest(matches.filter(m => !m.isFixture));
-      const fixtures = sortFixturesByNearest(matches.filter(m => m.isFixture));
-      groups.hurling[competition] = [...results, ...fixtures];
-    } else if (hasResults) {
-      // Results only - sort by newest first
-      groups.hurling[competition] = sortResultsByNewest(matches);
-    } else {
-      // Fixtures only - sort by nearest first
-      groups.hurling[competition] = sortFixturesByNearest(matches);
-    }
-  });
-
-  Object.keys(groups.football).forEach(competition => {
-    const matches = groups.football[competition];
-    const hasResults = matches.some(m => !m.isFixture);
-    const hasFixtures = matches.some(m => m.isFixture);
-    
-    if (hasResults && hasFixtures) {
-      // Mixed group - separate and sort each type
-      const results = sortResultsByNewest(matches.filter(m => !m.isFixture));
-      const fixtures = sortFixturesByNearest(matches.filter(m => m.isFixture));
-      groups.football[competition] = [...results, ...fixtures];
-    } else if (hasResults) {
-      // Results only - sort by newest first
-      groups.football[competition] = sortResultsByNewest(matches);
-    } else {
-      // Fixtures only - sort by nearest first
-      groups.football[competition] = sortFixturesByNearest(matches);
-    }
-  });
-
-  return groups;
-}
-
 // Helper function to get the upcoming weekend dates
 function getUpcomingWeekendDates(): { saturday: Date; sunday: Date } {
   const now = new Date();
@@ -1396,28 +1301,6 @@ export default function HomePage() {
     };
   }, []);
 
-  // Get latest senior championship results with intelligent fallback
-  const { results: latestResults } = useMemo(() => {
-    console.log('Getting latest results for sport:', activeSport);
-    return getLatestResults(matches, activeSport);
-  }, [matches, activeSport]);
-  
-  // Apply time-based filtering for fixtures (senior championships only)
-  const seniorMatches = useMemo(() => {
-    console.log('Filtering senior championships');
-    return filterSeniorChampionships(matches);
-  }, [matches]);
-
-  const upcomingFixtures = useMemo(() => {
-    console.log('Filtering upcoming fixtures');
-    return filterThisWeekendFixtures(seniorMatches);
-  }, [seniorMatches]);
-
-  const futureFixtures = useMemo(() => {
-    console.log('Filtering future fixtures');
-    return filterFutureFixtures(seniorMatches);
-  }, [seniorMatches]);
-  
   // Get all results and fixtures for current sport
   const allResults = useMemo(() => {
     return matches

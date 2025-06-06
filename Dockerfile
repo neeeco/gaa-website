@@ -22,27 +22,32 @@ RUN apt-get update && apt-get install -y \
     libpango-1.0-0 \
     libcairo2 \
     libasound2 \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Create app directory and ensure proper permissions
+# Create app directory
 WORKDIR /app
-RUN mkdir -p /app/data && chown -R node:node /app
+
+# First install Playwright and browser as root
+COPY package*.json ./
+RUN npm ci && \
+    npx playwright install chromium && \
+    npx playwright install-deps
+
+# Create necessary directories
+RUN mkdir -p /app/data /app/logs
+
+# Set ownership of the app directory
+RUN chown -R node:node /app \
+    && chmod -R 755 /app \
+    && mkdir -p /home/node/.cache \
+    && chown -R node:node /home/node
 
 # Switch to non-root user
 USER node
 
-# Copy package files with correct ownership
-COPY --chown=node:node package*.json ./
-
-# Install dependencies and Playwright browser
-RUN npm ci && \
-    npx playwright install chromium --with-deps
-
 # Copy source code with correct ownership
 COPY --chown=node:node . .
-
-# Create necessary directories with proper permissions
-RUN mkdir -p /app/data /app/logs
 
 # Build TypeScript
 RUN npm run build

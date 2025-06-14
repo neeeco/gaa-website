@@ -936,7 +936,6 @@ function GroupTable({ group }: { group: EnhancedGroup }) {
 function MatchRow({ match }: { match: Match }) {
   const isLive = isMatchLive(match);
   const venue = getSimplifiedVenue(match.venue);
-  const { text: dateDesc } = getDateDescription(match);
   const homeTeamLogo = getTeamLogo(match.homeTeam);
   const awayTeamLogo = getTeamLogo(match.awayTeam);
 

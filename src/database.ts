@@ -1,4 +1,5 @@
 import { Pool } from 'pg';
+import 'dotenv/config';
 
 interface Match {
   id?: number;
@@ -24,14 +25,28 @@ class MatchDatabase {
     // Railway automatically provides DATABASE_URL
     const connectionString = process.env.DATABASE_URL;
     if (!connectionString) {
+      console.error('Environment variables:', {
+        DATABASE_URL: process.env.DATABASE_URL ? 'Set (hidden)' : 'Not set',
+        NODE_ENV: process.env.NODE_ENV
+      });
       throw new Error('DATABASE_URL environment variable is required');
     }
 
+    console.log('Initializing database connection...');
     this.pool = new Pool({
       connectionString,
       ssl: {
         rejectUnauthorized: false // Required for Railway's SSL
       }
+    });
+
+    // Test the connection
+    this.pool.on('connect', () => {
+      console.log('Successfully connected to database');
+    });
+
+    this.pool.on('error', (err) => {
+      console.error('Unexpected error on idle client', err);
     });
   }
 

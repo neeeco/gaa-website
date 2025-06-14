@@ -1,6 +1,9 @@
+// Load environment variables from .env file
+import 'dotenv/config';
+
 import express, { Request, Response } from 'express';
 import cors from 'cors';
-import { scrapeGAAFixturesAndResults } from './scraper';
+import { scrapeGAAFixturesAndResults, shouldScrape, forceScrape } from './scraper';
 import { loadMatches, saveMatches } from './utils/storage';
 
 const app = express();
@@ -23,6 +26,25 @@ app.get('/health', (req: Request, res: Response) => {
   res.json({ status: 'ok' });
 });
 
+// Add a force scrape endpoint
+app.get('/api/force-scrape', async (req: Request, res: Response) => {
+  try {
+    forceScrape();
+    const matches = await scrapeGAAFixturesAndResults();
+    saveMatches(matches);
+    res.json({ 
+      message: 'Forced scrape completed successfully',
+      matchesCount: matches.length
+    });
+  } catch (error) {
+    console.error('Error in force scrape:', error);
+    res.status(500).json({ 
+      error: 'Failed to force scrape',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 app.get('/api/matches', async (req: Request, res: Response) => {
   try {
     console.log('Received request for matches');
@@ -37,10 +59,17 @@ app.get('/api/matches', async (req: Request, res: Response) => {
       console.log('Serving cached data from file');
       matches = storedData.matches;
     } else {
-      console.log('Cache expired or empty, fetching new data...');
-      matches = await scrapeGAAFixturesAndResults();
-      console.log(`Scraped ${matches.length} matches, saving to file...`);
-      saveMatches(matches);
+      console.log('Cache expired or empty, checking if scrape is needed...');
+      
+      if (shouldScrape()) {
+        console.log('Starting new scrape...');
+        matches = await scrapeGAAFixturesAndResults();
+        console.log(`Scraped ${matches.length} matches, saving to file...`);
+        saveMatches(matches);
+      } else {
+        console.log('Using existing data, next scrape not due yet');
+        matches = storedData?.matches || [];
+      }
     }
     
     // Allow filtering by isFixture query parameter
@@ -85,4 +114,5 @@ app.listen(port, '0.0.0.0', () => {
   console.log(`- GET http://localhost:${port}/api/matches`);
   console.log(`- GET http://localhost:${port}/api/matches?isFixture=true`);
   console.log(`- GET http://localhost:${port}/api/matches?isFixture=false`);
+  console.log(`- GET http://localhost:${port}/api/force-scrape`);
 }); 

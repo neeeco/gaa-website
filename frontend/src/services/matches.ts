@@ -1,7 +1,9 @@
 import { Match } from '@/types/matches';
 
-// where to find backend:   https://gaa-website-production.up.railway.app   or rvert back to 'http://localhost:3000';
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+// Use localhost in development, production URL in production
+const API_URL = process.env.NODE_ENV === 'development' 
+  ? 'http://localhost:3001'
+  : process.env.NEXT_PUBLIC_API_URL || 'https://gaa-website-production.up.railway.app';
 
 export async function getMatches(isFixture?: boolean): Promise<Match[]> {
   try {
@@ -10,7 +12,11 @@ export async function getMatches(isFixture?: boolean): Promise<Match[]> {
       : `${API_URL}/api/matches`;
       
     console.log('Fetching matches from:', url);
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      // Add cache control to prevent stale data
+      cache: 'no-store',
+      next: { revalidate: 0 }
+    });
 
         
     if (!response.ok) {
@@ -134,15 +140,28 @@ export async function getMatchStats() {
 
 export async function refreshMatches() {
   try {
-    const response = await fetch(`${API_URL}/api/refresh`, {
-      method: 'POST'
+    console.log('Forcing fresh scrape...');
+    const response = await fetch(`${API_URL}/api/force-scrape`, {
+      method: 'GET',
+      cache: 'no-store',
+      next: { revalidate: 0 }
     });
+    
     if (!response.ok) {
-      throw new Error('Failed to refresh matches');
+      const errorText = await response.text();
+      console.error('Force scrape failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText
+      });
+      throw new Error(`Failed to force scrape: ${response.status} ${response.statusText}`);
     }
-    return response.json();
+    
+    const result = await response.json();
+    console.log('Force scrape result:', result);
+    return result;
   } catch (error) {
-    console.error('Error refreshing matches:', error);
+    console.error('Error forcing scrape:', error);
     throw error;
   }
 } 

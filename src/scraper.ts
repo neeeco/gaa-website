@@ -1,6 +1,8 @@
 // GAA Fixtures and Results Scraper
-// Updated: June 4th, 2025 - Enhanced team name extraction
+// Updated: June 6th, 2025 - Implemented 24-hour schedule
 import { chromium } from 'playwright';
+import fs from 'fs';
+import path from 'path';
 
 interface Match {
   competition: string;
@@ -19,7 +21,46 @@ interface Match {
 
 // Rate limiting variables
 let lastScrapeTime = 0;
-const MIN_SCRAPE_INTERVAL = 5 * 60 * 1000; // 5 minutes minimum between scrapes
+const SCRAPE_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+const SCRAPE_HISTORY_FILE = path.join(process.cwd(), 'data', 'scrape-history.json');
+
+// Ensure data directory exists
+if (!fs.existsSync(path.join(process.cwd(), 'data'))) {
+  fs.mkdirSync(path.join(process.cwd(), 'data'), { recursive: true });
+}
+
+// Load last scrape time from file
+try {
+  if (fs.existsSync(SCRAPE_HISTORY_FILE)) {
+    const history = JSON.parse(fs.readFileSync(SCRAPE_HISTORY_FILE, 'utf-8'));
+    lastScrapeTime = history.lastScrapeTime || 0;
+  }
+} catch (error) {
+  console.error('Error loading scrape history:', error);
+}
+
+// Save last scrape time to file
+const saveScrapeTime = () => {
+  try {
+    fs.writeFileSync(SCRAPE_HISTORY_FILE, JSON.stringify({
+      lastScrapeTime: Date.now(),
+      lastScrapeDate: new Date().toISOString()
+    }, null, 2));
+  } catch (error) {
+    console.error('Error saving scrape history:', error);
+  }
+};
+
+// Check if a scrape is needed
+export const shouldScrape = (): boolean => {
+  const now = Date.now();
+  return now - lastScrapeTime >= SCRAPE_INTERVAL;
+};
+
+// Force a fresh scrape
+export const forceScrape = (): void => {
+  lastScrapeTime = 0;
+};
 
 // User agents pool for rotation
 const USER_AGENTS = [
@@ -45,10 +86,14 @@ const getCacheDuration = () => {
 export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
   // Rate limiting check
   const now = Date.now();
-  if (now - lastScrapeTime < MIN_SCRAPE_INTERVAL) {
-    throw new Error(`Rate limited - please wait ${Math.ceil((MIN_SCRAPE_INTERVAL - (now - lastScrapeTime)) / 1000)} seconds before next scrape`);
+  if (now - lastScrapeTime < SCRAPE_INTERVAL) {
+    const nextScrapeTime = new Date(lastScrapeTime + SCRAPE_INTERVAL);
+    throw new Error(`Rate limited - next scrape available at ${nextScrapeTime.toLocaleString()}`);
   }
+
+  console.log('Starting fresh scrape...');
   lastScrapeTime = now;
+  saveScrapeTime();
 
   console.log('Starting browser with enhanced stealth configuration...');
   

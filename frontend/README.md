@@ -16,8 +16,9 @@ A modern web application for viewing GAA (Gaelic Athletic Association) match res
 
 ## Technology Stack
 
-- **Frontend**: Next.js 15 with React 19
+- **Frontend**: Next.js 15.3.2 with React 19
 - **Styling**: Tailwind CSS 4
+- **Development**: Turbopack for faster builds
 - **Deployment**: Vercel
 - **Backend**: Railway (Express.js + Playwright scraper)
 - **Database**: SQLite with 180-day retention
@@ -34,7 +35,7 @@ Run the development server:
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to view the application.
+Open [http://localhost:3452](http://localhost:3452) to view the application.
 
 ## Environment Variables
 
@@ -42,7 +43,7 @@ The application automatically connects to the production API when deployed. For 
 
 ## Deployment
 
-The application is automatically deployed to Vercel at [https://gaa.vercel.app/](https://gaa.vercel.app/) when changes are pushed to the main branch.
+The application is automatically deployed to Vercel at [https://gaa-website.vercel.app/](https://gaa-website.vercel.app/) when changes are pushed to the main branch.
 
 ## Project Structure
 
@@ -56,6 +57,13 @@ frontend/
 ├── public/           # Static assets
 └── package.json      # Dependencies and scripts
 ```
+
+## Development Features
+
+- **Turbopack**: Enabled for faster development builds
+- **TypeScript**: Full type safety with React 19 types
+- **ESLint**: Latest configuration with Next.js 15.3.2 rules
+- **Tailwind CSS**: Latest version with PostCSS integration
 
 ## Learn More
 

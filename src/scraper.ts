@@ -1,6 +1,7 @@
 // GAA Fixtures and Results Scraper
-// Updated: June 6th, 2025 - Implemented 24-hour schedule
+// Updated: June 6th, 2025 - Using database for scrape history
 import { chromium } from 'playwright';
+import { matchDatabase } from './database';
 import fs from 'fs';
 import path from 'path';
 
@@ -29,15 +30,19 @@ if (!fs.existsSync(path.join(process.cwd(), 'data'))) {
   fs.mkdirSync(path.join(process.cwd(), 'data'), { recursive: true });
 }
 
-// Load last scrape time from file
-try {
-  if (fs.existsSync(SCRAPE_HISTORY_FILE)) {
-    const history = JSON.parse(fs.readFileSync(SCRAPE_HISTORY_FILE, 'utf-8'));
-    lastScrapeTime = history.lastScrapeTime || 0;
+// Load last scrape time from database
+const loadLastScrapeTime = async (): Promise<number> => {
+  try {
+    const stats = await matchDatabase.getMatchStats();
+    if (stats?.lastUpdated) {
+      return new Date(stats.lastUpdated).getTime();
+    }
+    return 0;
+  } catch (error) {
+    console.error('Error loading last scrape time from database:', error);
+    return 0;
   }
-} catch (error) {
-  console.error('Error loading scrape history:', error);
-}
+};
 
 // Save last scrape time to file
 const saveScrapeTime = () => {
@@ -52,9 +57,10 @@ const saveScrapeTime = () => {
 };
 
 // Check if a scrape is needed
-export const shouldScrape = (): boolean => {
+export const shouldScrape = async (): Promise<boolean> => {
   const now = Date.now();
-  return now - lastScrapeTime >= SCRAPE_INTERVAL;
+  const lastScrape = await loadLastScrapeTime();
+  return now - lastScrape >= SCRAPE_INTERVAL;
 };
 
 // Force a fresh scrape
@@ -86,8 +92,10 @@ const getCacheDuration = () => {
 export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
   // Rate limiting check
   const now = Date.now();
-  if (now - lastScrapeTime < SCRAPE_INTERVAL) {
-    const nextScrapeTime = new Date(lastScrapeTime + SCRAPE_INTERVAL);
+  const lastScrape = await loadLastScrapeTime();
+  
+  if (now - lastScrape < SCRAPE_INTERVAL && lastScrapeTime === 0) {
+    const nextScrapeTime = new Date(lastScrape + SCRAPE_INTERVAL);
     throw new Error(`Rate limited - next scrape available at ${nextScrapeTime.toLocaleString()}`);
   }
 

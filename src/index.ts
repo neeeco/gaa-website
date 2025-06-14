@@ -61,7 +61,7 @@ app.get('/api/matches', async (req: Request, res: Response) => {
     } else {
       console.log('Cache expired or empty, checking if scrape is needed...');
       
-      if (shouldScrape()) {
+      if (await shouldScrape()) {
         console.log('Starting new scrape...');
         matches = await scrapeGAAFixturesAndResults();
         console.log(`Scraped ${matches.length} matches, saving to file...`);

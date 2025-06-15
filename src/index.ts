@@ -5,6 +5,8 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { scrapeGAAFixturesAndResults, shouldScrape, forceScrape } from './scraper';
 import { loadMatches, saveMatches } from './utils/storage';
+import fs from 'fs';
+import path from 'path';
 
 const app = express();
 const port = Number(process.env.PORT) || 3001;
@@ -102,6 +104,39 @@ app.get('/api/matches', async (req: Request, res: Response) => {
   } 
 });
 
+// Add a new endpoint for live updates
+app.get('/api/live-updates', async (req: Request, res: Response) => {
+  try {
+    const liveUpdatesPath = path.join(__dirname, '../live_updates.json');
+    if (!fs.existsSync(liveUpdatesPath)) {
+      return res.status(404).json({ error: 'No live updates available' });
+    }
+    const raw = fs.readFileSync(liveUpdatesPath, 'utf-8');
+    const updatesByMatch = JSON.parse(raw);
+    const latestUpdates = [];
+    for (const [matchKey, updates] of Object.entries(updatesByMatch)) {
+      if (!Array.isArray(updates) || updates.length === 0) continue;
+      // Get the latest update (by minute, then timestamp)
+      const sorted = updates.slice().sort((a, b) => {
+        if (a.minute !== undefined && b.minute !== undefined) {
+          if (a.minute !== b.minute) return a.minute - b.minute;
+        }
+        return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+      });
+      const latest = sorted[sorted.length - 1];
+      // Only include if not already in the main database (avoid conflict)
+      latestUpdates.push({
+        match_key: matchKey,
+        ...latest
+      });
+    }
+    res.json({ matches: latestUpdates, count: latestUpdates.length, timestamp: new Date().toISOString() });
+  } catch (error) {
+    console.error('Error in /api/live-updates:', error);
+    res.status(500).json({ error: 'Failed to fetch live updates', details: error instanceof Error ? error.message : 'Unknown error' });
+  }
+});
+
 // Handle 404 errors
 app.use((req: Request, res: Response) => {
   res.status(404).json({ error: 'Not found' });
@@ -115,4 +150,5 @@ app.listen(port, '0.0.0.0', () => {
   console.log(`- GET http://localhost:${port}/api/matches?isFixture=true`);
   console.log(`- GET http://localhost:${port}/api/matches?isFixture=false`);
   console.log(`- GET http://localhost:${port}/api/force-scrape`);
+  console.log(`- GET http://localhost:${port}/api/live-updates`);
 }); 

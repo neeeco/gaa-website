@@ -1,4 +1,4 @@
-import { Pool } from 'pg';
+import { createClient } from '@supabase/supabase-js';
 import 'dotenv/config';
 
 interface Match {
@@ -19,276 +19,251 @@ interface Match {
 }
 
 class MatchDatabase {
-  private pool: Pool | null = null;
+  private supabase;
 
   constructor() {
-    // Railway automatically provides DATABASE_URL
-    const connectionString = process.env.DATABASE_URL;
-    if (!connectionString) {
-      console.error('Environment variables:', {
-        DATABASE_URL: process.env.DATABASE_URL ? 'Set (hidden)' : 'Not set',
-        NODE_ENV: process.env.NODE_ENV
-      });
-      throw new Error('DATABASE_URL environment variable is required');
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Missing Supabase credentials in environment variables');
     }
 
-    console.log('Initializing database connection...');
-    this.pool = new Pool({
-      connectionString,
-      ssl: {
-        rejectUnauthorized: false // Required for Railway's SSL
-      }
-    });
+    this.supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Test the connection
-    this.pool.on('connect', () => {
-      console.log('Successfully connected to database');
-    });
-
-    this.pool.on('error', (err) => {
-      console.error('Unexpected error on idle client', err);
+    // Log configuration (without sensitive info)
+    console.log('Database configuration:', {
+      SUPABASE_URL: supabaseUrl ? 'Set (hidden)' : 'Not set',
+      SUPABASE_KEY: supabaseKey ? 'Set (hidden)' : 'Not set',
+      NODE_ENV: process.env.NODE_ENV
     });
   }
 
-  async init(): Promise<void> {
+  async init() {
     try {
-      // Create matches table if it doesn't exist
-      await this.pool!.query(`
-        CREATE TABLE IF NOT EXISTS matches (
-          id SERIAL PRIMARY KEY,
-          competition TEXT NOT NULL,
-          homeTeam TEXT NOT NULL,
-          awayTeam TEXT NOT NULL,
-          homeScore TEXT,
-          awayScore TEXT,
-          venue TEXT,
-          referee TEXT,
-          date TEXT NOT NULL,
-          time TEXT,
-          broadcasting TEXT,
-          isFixture BOOLEAN NOT NULL,
-          scrapedAt TIMESTAMP NOT NULL,
-          createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          UNIQUE(homeTeam, awayTeam, date, competition)
-        )
-      `);
+      // Test connection by making a simple query
+      const { data, error } = await this.supabase
+        .from('matches')
+        .select('count')
+        .limit(1);
 
-      // Create indexes for faster queries
-      await this.pool!.query(`
-        CREATE INDEX IF NOT EXISTS idx_matches_date ON matches(date);
-        CREATE INDEX IF NOT EXISTS idx_matches_fixture ON matches(isFixture);
-        CREATE INDEX IF NOT EXISTS idx_matches_competition ON matches(competition);
-        CREATE INDEX IF NOT EXISTS idx_matches_teams ON matches(homeTeam, awayTeam);
-      `);
-
-      console.log('Database initialized successfully');
+      if (error) throw error;
+      console.log('Database connection successful');
     } catch (error) {
-      console.error('Failed to initialize database:', error);
+      console.error('Database connection failed:', error);
       throw error;
     }
   }
 
-  async saveMatches(matches: Match[]): Promise<{ saved: number; updated: number; errors: number }> {
-    let saved = 0;
-    let updated = 0;
-    let errors = 0;
-
-    const client = await this.pool!.connect();
+  async saveMatches(matches: Match[]) {
     try {
-      await client.query('BEGIN');
-
       for (const match of matches) {
-        try {
-          // Validate required fields
-          if (!match.competition?.trim() || !match.homeTeam?.trim() || !match.awayTeam?.trim() || !match.date?.trim()) {
-            console.warn('Skipping match with empty required fields:', match);
-            errors++;
-            continue;
-          }
+        const { error } = await this.supabase
+          .from('matches')
+          .upsert({
+            competition: match.competition,
+            hometeam: match.homeTeam,
+            awayteam: match.awayTeam,
+            homescore: match.homeScore,
+            awayscore: match.awayScore,
+            venue: match.venue,
+            referee: match.referee,
+            date: match.date,
+            time: match.time,
+            broadcasting: match.broadcasting,
+            isfixture: match.isFixture,
+            scrapedat: match.scrapedAt || new Date().toISOString()
+          }, {
+            onConflict: 'hometeam,awayteam,date,competition'
+          });
 
-          // Clean and validate data
-          const cleanMatch = {
-            ...match,
-            competition: match.competition.trim(),
-            homeTeam: match.homeTeam.trim(),
-            awayTeam: match.awayTeam.trim(),
-            date: match.date.trim(),
-            homeScore: match.homeScore?.trim() || null,
-            awayScore: match.awayScore?.trim() || null,
-            venue: match.venue?.trim() || null,
-            referee: match.referee?.trim() || null,
-            time: match.time?.trim() || null,
-            broadcasting: match.broadcasting?.trim() || null,
-            isFixture: Boolean(match.isFixture),
-            scrapedAt: match.scrapedAt || new Date().toISOString()
-          };
-
-          const result = await client.query(
-            `
-            INSERT INTO matches (
-              competition, homeTeam, awayTeam, homeScore, awayScore,
-              venue, referee, date, time, broadcasting, isFixture, scrapedAt
-            ) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-            ON CONFLICT (homeTeam, awayTeam, date, competition)
-            DO UPDATE SET
-              homeScore = EXCLUDED.homeScore,
-              awayScore = EXCLUDED.awayScore,
-              venue = EXCLUDED.venue,
-              referee = EXCLUDED.referee,
-              time = EXCLUDED.time,
-              broadcasting = EXCLUDED.broadcasting,
-              isFixture = EXCLUDED.isFixture,
-              scrapedAt = EXCLUDED.scrapedAt
-            RETURNING (xmax = 0) as inserted
-            `,
-            [
-              cleanMatch.competition,
-              cleanMatch.homeTeam,
-              cleanMatch.awayTeam,
-              cleanMatch.homeScore,
-              cleanMatch.awayScore,
-              cleanMatch.venue,
-              cleanMatch.referee,
-              cleanMatch.date,
-              cleanMatch.time,
-              cleanMatch.broadcasting,
-              cleanMatch.isFixture,
-              cleanMatch.scrapedAt
-            ]
-          );
-
-          if (result.rows[0].inserted) {
-            saved++;
-          } else {
-            updated++;
-          }
-        } catch (error) {
-          console.error('Error saving match:', error, match);
-          errors++;
-        }
+        if (error) throw error;
       }
-
-      await client.query('COMMIT');
     } catch (error) {
-      await client.query('ROLLBACK');
       throw error;
-    } finally {
-      client.release();
     }
-
-    console.log(`Database operation completed: ${saved} saved, ${updated} updated, ${errors} errors`);
-    return { saved, updated, errors };
   }
 
-  async getMatches(filters: {
-    isFixture?: boolean;
-    competition?: string;
-    startDate?: string;
-    endDate?: string;
-    limit?: number;
-  } = {}): Promise<Match[]> {
-    let sql = 'SELECT * FROM matches WHERE 1=1';
-    const params: any[] = [];
-    let paramCount = 1;
+  async getMatches(options: { isFixture?: boolean; competition?: string } = {}) {
+    console.log('Database getMatches called with options:', options);
+    
+    let query = this.supabase
+      .from('matches')
+      .select('*');
 
-    if (filters.isFixture !== undefined) {
-      sql += ` AND isFixture = $${paramCount++}`;
-      params.push(filters.isFixture);
+    if (options.isFixture !== undefined) {
+      console.log('Filtering by isFixture:', options.isFixture);
+      query = query.eq('isfixture', options.isFixture);
     }
 
-    if (filters.competition) {
-      sql += ` AND competition ILIKE $${paramCount++}`;
-      params.push(`%${filters.competition}%`);
+    if (options.competition) {
+      console.log('Filtering by competition:', options.competition);
+      query = query.ilike('competition', `%${options.competition}%`);
     }
 
-    if (filters.startDate) {
-      sql += ` AND date >= $${paramCount++}`;
-      params.push(filters.startDate);
+    console.log('Executing database query...');
+    const { data, error } = await query
+      .order('date', { ascending: false })
+      .order('time', { ascending: false });
+
+    if (error) {
+      console.error('Database query error:', error);
+      throw error;
     }
 
-    if (filters.endDate) {
-      sql += ` AND date <= $${paramCount++}`;
-      params.push(filters.endDate);
+    console.log('Raw database matches:', JSON.stringify(data, null, 2));
+    console.log('Number of matches found:', data.length);
+
+    if (!data || data.length === 0) {
+      console.log('No matches found in database');
+      return [];
     }
 
-    sql += ' ORDER BY date ASC, time ASC';
+    // Transform snake_case to camelCase and ensure proper types
+    const transformedMatches = data
+      .map(match => {
+        console.log('Processing match:', JSON.stringify(match, null, 2));
+        
+        // Transform and validate the match data
+        const transformed = {
+          competition: String(match.competition || '').trim(),
+          homeTeam: String(match.hometeam || '').trim(),
+          awayTeam: String(match.awayteam || '').trim(),
+          homeScore: match.homescore ? String(match.homescore).trim() : undefined,
+          awayScore: match.awayscore ? String(match.awayscore).trim() : undefined,
+          venue: match.venue ? String(match.venue).trim() : undefined,
+          referee: match.referee ? String(match.referee).trim() : undefined,
+          date: String(match.date || '').trim(),
+          time: match.time ? String(match.time).trim() : undefined,
+          broadcasting: match.broadcasting ? String(match.broadcasting).trim() : undefined,
+          isFixture: Boolean(match.isfixture),
+          scrapedAt: match.scrapedat ? String(match.scrapedat) : new Date().toISOString(),
+          createdAt: match.createdat ? String(match.createdat) : undefined
+        };
 
-    if (filters.limit) {
-      sql += ` LIMIT $${paramCount++}`;
-      params.push(filters.limit);
+        // Validate required fields
+        const requiredFields = ['competition', 'homeTeam', 'awayTeam', 'date', 'isFixture'];
+        const missingFields = requiredFields.filter(field => {
+          if (field === 'isFixture') {
+            return typeof transformed[field] !== 'boolean';
+          }
+          const value = transformed[field];
+          return !value || (typeof value === 'string' && value.trim().length === 0);
+        });
+
+        if (missingFields.length > 0) {
+          console.warn(`Match missing required fields: ${missingFields.join(', ')}`);
+          return null;
+        }
+
+        console.log('Transformed match:', JSON.stringify(transformed, null, 2));
+        return transformed;
+      })
+      .filter((match): match is NonNullable<typeof match> => match !== null);
+
+    console.log('Final transformed matches:', JSON.stringify(transformedMatches, null, 2));
+    console.log('Number of valid matches:', transformedMatches.length);
+
+    if (transformedMatches.length === 0) {
+      console.warn('No valid matches found after transformation');
     }
 
-    const { rows } = await this.pool!.query(sql, params);
-
-    return rows.map(row => ({
-      id: row.id,
-      competition: row.competition,
-      homeTeam: row.hometeam,
-      awayTeam: row.awayteam,
-      homeScore: row.homescore,
-      awayScore: row.awayscore,
-      venue: row.venue,
-      referee: row.referee,
-      date: row.date,
-      time: row.time,
-      broadcasting: row.broadcasting,
-      isFixture: row.isfixture,
-      scrapedAt: row.scrapedat,
-      createdAt: row.createdat
-    }));
+    return transformedMatches;
   }
 
-  async getMatchStats(): Promise<{
-    total: number;
-    fixtures: number;
-    results: number;
-    competitions: string[];
-    lastUpdated: string | null;
-  }> {
-    const statsResult = await this.pool!.query(`
-      SELECT 
-        COUNT(*) as total,
-        COUNT(*) FILTER (WHERE isFixture) as fixtures,
-        COUNT(*) FILTER (WHERE NOT isFixture) as results,
-        MAX(scrapedAt) as lastUpdated
-      FROM matches
-    `);
+  async getMatchStats() {
+    const { data, error } = await this.supabase
+      .rpc('get_match_stats');
 
-    const competitionsResult = await this.pool!.query(`
-      SELECT DISTINCT competition 
-      FROM matches 
-      ORDER BY competition
-    `);
-
-    const stats = statsResult.rows[0];
-    return {
-      total: parseInt(stats.total) || 0,
-      fixtures: parseInt(stats.fixtures) || 0,
-      results: parseInt(stats.results) || 0,
-      competitions: competitionsResult.rows.map(r => r.competition),
-      lastUpdated: stats.lastupdated
-    };
+    if (error) throw error;
+    return data;
   }
 
-  async deleteOldMatches(daysOld: number = 90): Promise<number> {
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - daysOld);
+  async saveLiveUpdate(matchKey: string, update: {
+    minute: number;
+    homeTeam: string;
+    awayTeam: string;
+    homeScore: string;
+    awayScore: string;
+    isFinal: boolean;
+  }) {
+    try {
+      // Insert into live_updates
+      const { error: updateError } = await this.supabase
+        .from('live_updates')
+        .insert({
+          match_key: matchKey,
+          minute: update.minute,
+          home_team: update.homeTeam,
+          away_team: update.awayTeam,
+          home_score: update.homeScore,
+          away_score: update.awayScore,
+          is_final: update.isFinal,
+          timestamp: new Date().toISOString()
+        });
 
-    const result = await this.pool!.query(
-      'DELETE FROM matches WHERE scrapedAt < $1',
-      [cutoffDate.toISOString()]
-    );
+      if (updateError) throw updateError;
 
-    console.log(`Deleted ${result.rowCount} old matches (older than ${daysOld} days)`);
-    return result.rowCount || 0;
-  }
+      // Update live_scores
+      const { error: scoreError } = await this.supabase
+        .from('live_scores')
+        .upsert({
+          match_key: matchKey,
+          home_team: update.homeTeam,
+          away_team: update.awayTeam,
+          home_score: update.homeScore,
+          away_score: update.awayScore,
+          minute: update.minute,
+          is_final: update.isFinal,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'match_key'
+        });
 
-  async close(): Promise<void> {
-    if (this.pool) {
-      await this.pool.end();
-      this.pool = null;
+      if (scoreError) throw scoreError;
+    } catch (error) {
+      throw error;
     }
+  }
+
+  async getLiveScores() {
+    const { data, error } = await this.supabase
+      .from('live_scores')
+      .select('*')
+      .gt('updated_at', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString())
+      .order('updated_at', { ascending: false });
+
+    if (error) throw error;
+    return data;
+  }
+
+  async getLiveUpdates(matchKey: string) {
+    const { data, error } = await this.supabase
+      .from('live_updates')
+      .select('*')
+      .eq('match_key', matchKey)
+      .order('timestamp', { ascending: false })
+      .limit(50);
+
+    if (error) throw error;
+    return data;
+  }
+
+  async deleteOldMatches(daysToKeep: number) {
+    const { data, error } = await this.supabase
+      .from('matches')
+      .delete()
+      .lt('scrapedat', new Date(Date.now() - daysToKeep * 24 * 60 * 60 * 1000).toISOString())
+      .select();
+
+    if (error) throw error;
+    return data.length;
+  }
+
+  async close() {
+    // No need to close connection with Supabase client
+    // It handles connection management automatically
+    return Promise.resolve();
   }
 }
 

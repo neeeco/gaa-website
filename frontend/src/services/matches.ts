@@ -55,15 +55,34 @@ export async function getMatches(isFixture?: boolean): Promise<Match[]> {
           return false;
         }
         
+        console.log('Validating match:', JSON.stringify(match, null, 2));
+        
         // Required fields validation with non-empty string check
         const requiredFields = ['competition', 'homeTeam', 'awayTeam', 'date', 'isFixture'];
         const missingFields = requiredFields.filter(field => {
           // Special case for isFixture which should be a boolean
           if (field === 'isFixture') {
-            return typeof match[field] !== 'boolean';
+            const isBoolean = typeof match[field] === 'boolean';
+            if (!isBoolean) {
+              console.warn(`Field ${field} is not a boolean:`, match[field]);
+            }
+            return !isBoolean;
           }
           // For string fields, check they exist and are non-empty strings
-          return !match[field] || typeof match[field] !== 'string' || !match[field].trim();
+          const hasField = match[field] !== undefined && match[field] !== null;
+          const isString = typeof match[field] === 'string';
+          const isNonEmpty = isString && match[field].trim().length > 0;
+          
+          if (!hasField || !isString || !isNonEmpty) {
+            console.warn(`Field ${field} validation failed:`, {
+              hasField,
+              isString,
+              isNonEmpty,
+              value: match[field]
+            });
+          }
+          
+          return !hasField || !isString || !isNonEmpty;
         });
         
         if (missingFields.length > 0) {
@@ -163,5 +182,23 @@ export async function refreshMatches() {
   } catch (error) {
     console.error('Error forcing scrape:', error);
     throw error;
+  }
+}
+
+export async function getLiveUpdates(): Promise<any[]> {
+  const url = `${API_URL}/api/live-updates`;
+  try {
+    const response = await fetch(url, {
+      cache: 'no-store',
+      next: { revalidate: 0 }
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch live updates: ${response.status} ${response.statusText}`);
+    }
+    const data = await response.json();
+    return data.matches || [];
+  } catch (err) {
+    console.error('Error fetching live updates:', err);
+    return [];
   }
 } 

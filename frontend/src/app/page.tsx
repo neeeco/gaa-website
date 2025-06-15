@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import Image from 'next/image';
 import { Match, GroupTeam, Group, isValidMatch, isValidString } from '../types/matches';
-import { getMatches } from '@/services/matches';
+import { getMatches, getLiveUpdates } from '@/services/matches';
 
 // Helper function to determine if a match is hurling
 function isHurlingMatch(match: Match): boolean {
@@ -1016,12 +1016,11 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [errorState, setErrorState] = useState<string | null>(null);
   const [activeSport, setActiveSport] = useState<'football' | 'hurling'>('football');
-  const [activeTab, setActiveTab] = useState<'fixtures' | 'results' | 'groups'>('fixtures');
+  const [activeTab, setActiveTab] = useState<'fixtures' | 'results' | 'groups' | 'live'>('fixtures');
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [weekendDatesMap, setWeekendDatesMap] = useState<Record<string, { saturday: Date; sunday: Date }>>({});
-
-  useEffect(() => {
-    let mounted = true;
+  const [mounted, setMounted] = useState(true);
+  const [liveUpdates, setLiveUpdates] = useState<any[]>([]);
 
     const fetchData = async () => {
       try {
@@ -1118,11 +1117,11 @@ export default function HomePage() {
       }
     };
 
+  useEffect(() => {
+    setMounted(true);
     fetchData();
-
-    // Cleanup function
     return () => {
-      mounted = false;
+      setMounted(false);
     };
   }, []);
 
@@ -1178,6 +1177,13 @@ export default function HomePage() {
     return isGroupStageComplete(updatedGroups);
   }, [updatedGroups]);
 
+  // Fetch live updates when Live Scores tab is selected
+  useEffect(() => {
+    if (activeTab === 'live') {
+      getLiveUpdates().then(setLiveUpdates);
+    }
+  }, [activeTab]);
+
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
@@ -1199,9 +1205,12 @@ export default function HomePage() {
           {/* Main Sport Tabs */}
           <div className="flex">
             <button
-              onClick={() => setActiveSport('football')}
+              onClick={() => {
+                setActiveSport('football');
+                setActiveTab('fixtures');
+              }}
               className={`px-4 py-3 text-sm font-medium transition-colors ${
-                activeSport === 'football'
+                activeSport === 'football' && activeTab !== 'live'
                   ? 'text-gray-900 font-semibold'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
@@ -1209,18 +1218,32 @@ export default function HomePage() {
               Football
             </button>
             <button
-              onClick={() => setActiveSport('hurling')}
+              onClick={() => {
+                setActiveSport('hurling');
+                setActiveTab('fixtures');
+              }}
               className={`px-4 py-3 text-sm font-medium transition-colors ${
-                activeSport === 'hurling'
+                activeSport === 'hurling' && activeTab !== 'live'
                   ? 'text-gray-900 font-semibold'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               Hurling
             </button>
+            <button
+              onClick={() => setActiveTab('live')}
+              className={`px-4 py-3 text-sm font-medium transition-colors ${
+                activeTab === 'live'
+                  ? 'text-red-600 font-semibold'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Live Scores
+            </button>
           </div>
 
-          {/* Sub Navigation Tabs */}
+          {/* Sub Navigation Tabs - Only show when not in Live Scores */}
+          {activeTab !== 'live' && (
           <div className="flex space-x-2 pt-2 pb-4">
             <button
               onClick={() => setActiveTab('fixtures')}
@@ -1257,6 +1280,7 @@ export default function HomePage() {
               </button>
             )}
           </div>
+          )}
         </div>
       </header>
 
@@ -1398,6 +1422,116 @@ export default function HomePage() {
                   <p className="text-sm text-gray-600">
                     Head-to-head rules apply for teams on level points after 3 games.
                   </p>
+                </div>
+              </section>
+            )}
+
+            {/* Live Scores Tab Content */}
+            {activeTab === 'live' && (
+              <section className="space-y-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-2xl font-bold text-gray-900">Live Scores</h2>
+                  <div className="text-sm text-gray-500">
+                    Showing latest scraped live updates
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  {(() => {
+                    // Only All-Ireland senior matches
+                    const isAllIrelandSenior = (u: any) => {
+                      const comp = u.competition?.toLowerCase() || '';
+                      return comp.includes('all-ireland') && comp.includes('senior') && !comp.includes('minor') && !comp.includes('junior');
+                    };
+                    const football = liveUpdates.filter(u => isAllIrelandSenior(u) && isFootballMatch(u));
+                    const hurling = liveUpdates.filter(u => isAllIrelandSenior(u) && isHurlingMatch(u));
+                    if (football.length === 0 && hurling.length === 0) {
+                      return <div className="text-center py-12 bg-gray-50 rounded-lg"><p className="text-gray-600">No All-Ireland senior matches with live updates right now</p></div>;
+                    }
+                    return (
+                      <div className="space-y-8">
+                        {football.length > 0 && (
+                          <div>
+                            <div className="mb-2">
+                              <span className="inline-block px-4 py-2 bg-gray-500 text-white rounded-full text-sm font-medium">Football</span>
+                            </div>
+                            <div className="space-y-4">
+                              {football.map((u, i) => (
+                                <div key={`football-${u.match_key}-${i}`} className="bg-white rounded-lg shadow-sm border border-gray-200">
+                                  <div className="p-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <div className="text-sm text-gray-500">{u.competition}</div>
+                                      {u.is_final ? (
+                                        <span className="bg-gray-700 text-white text-xs px-2 py-1 rounded-full font-bold">FT</span>
+                                      ) : (
+                                        <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full font-bold">LIVE {u.minute}'</span>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-3 flex-1">
+                                        <div className="w-8 h-8">
+                                          <Image src={getTeamLogo(u.home_team)} alt={`${u.home_team} logo`} width={32} height={32} className="object-contain" />
+                                        </div>
+                                        <span className="font-medium text-gray-900">{u.home_team}</span>
+                                      </div>
+                                      <div className="px-4">
+                                        <span className="font-bold text-gray-900">{u.home_score} - {u.away_score}</span>
+                                      </div>
+                                      <div className="flex items-center gap-3 flex-1 justify-end">
+                                        <span className="font-medium text-gray-900">{u.away_team}</span>
+                                        <div className="w-8 h-8">
+                                          <Image src={getTeamLogo(u.away_team)} alt={`${u.away_team} logo`} width={32} height={32} className="object-contain" />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {hurling.length > 0 && (
+                          <div>
+                            <div className="mb-2">
+                              <span className="inline-block px-4 py-2 bg-gray-500 text-white rounded-full text-sm font-medium">Hurling</span>
+                            </div>
+                            <div className="space-y-4">
+                              {hurling.map((u, i) => (
+                                <div key={`hurling-${u.match_key}-${i}`} className="bg-white rounded-lg shadow-sm border border-gray-200">
+                                  <div className="p-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <div className="text-sm text-gray-500">{u.competition}</div>
+                                      {u.is_final ? (
+                                        <span className="bg-gray-700 text-white text-xs px-2 py-1 rounded-full font-bold">FT</span>
+                                      ) : (
+                                        <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full font-bold">LIVE {u.minute}'</span>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-3 flex-1">
+                                        <div className="w-8 h-8">
+                                          <Image src={getTeamLogo(u.home_team)} alt={`${u.home_team} logo`} width={32} height={32} className="object-contain" />
+                                        </div>
+                                        <span className="font-medium text-gray-900">{u.home_team}</span>
+                                      </div>
+                                      <div className="px-4">
+                                        <span className="font-bold text-gray-900">{u.home_score} - {u.away_score}</span>
+                                      </div>
+                                      <div className="flex items-center gap-3 flex-1 justify-end">
+                                        <span className="font-medium text-gray-900">{u.away_team}</span>
+                                        <div className="w-8 h-8">
+                                          <Image src={getTeamLogo(u.away_team)} alt={`${u.away_team} logo`} width={32} height={32} className="object-contain" />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </section>
             )}

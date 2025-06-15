@@ -1,0 +1,35 @@
+{
+  "Monaghan vs Down": [
+    {
+      "minute": 40,
+      "home_team": "Monaghan",
+      "home_score": "1-16",
+      "away_team": "Down",
+      "away_score": "1-18",
+      "is_final": false,
+      "timestamp": "2025-06-15T15:05:57.745729"
+    }
+  ],
+  "GOAL! Clare vs Louth": [
+    {
+      "minute": 36,
+      "home_team": "GOAL! Clare",
+      "home_score": "1-06",
+      "away_team": "Louth",
+      "away_score": "2-08",
+      "is_final": false,
+      "timestamp": "2025-06-15T15:05:57.782273"
+    }
+  ],
+  "Wicklow vs Westmeath": [
+    {
+      "minute": 69,
+      "home_team": "Wicklow",
+      "home_score": "2-17",
+      "away_team": "Westmeath",
+      "away_score": "2-17",
+      "is_final": false,
+      "timestamp": "2025-06-15T15:05:57.816956"
+    }
+  ]
+}

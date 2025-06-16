@@ -16,9 +16,10 @@ function isHurlingMatch(match: Match): boolean {
     
     // Check if it's a hurling match
     const isHurling = compLower.includes('hurling') || 
-           compLower.includes('camán') || 
-           compLower.includes('iomaint') ||
-           compLower.includes('camogie');
+                      compLower.includes('camán') || 
+                      compLower.includes('iomaint') ||
+                      compLower.includes('camogie') ||
+                      compLower.includes('all-ireland') && !compLower.includes('football');
     
     // Must be hurling but not minor
     return isHurling && !isMinor;
@@ -34,16 +35,18 @@ function isFootballMatch(match: Match): boolean {
     if (!match?.competition) return false;
     const compLower = match.competition.toLowerCase();
     
-    // Must include "senior" and one of the football terms, but not include "minor"
-    const isSenior = compLower.includes('senior');
+    // Check if it's a minor game
     const isMinor = compLower.includes('minor');
-    const isFootball = (compLower.includes('football') || 
-                       compLower.includes('peil') ||
-                       compLower.includes('ladies football') ||
-                       compLower.includes('gaelic football')) &&
-                      !isHurlingMatch(match); // Ensure it's not categorized as hurling
     
-    return isSenior && isFootball && !isMinor;
+    // Check if it's a football match
+    const isFootball = compLower.includes('football') || 
+                      compLower.includes('peil') ||
+                      compLower.includes('ladies football') ||
+                      compLower.includes('gaelic football') ||
+                      compLower.includes('all-ireland') && !compLower.includes('hurling');
+    
+    // Must be football but not minor and not hurling
+    return isFootball && !isMinor && !isHurlingMatch(match);
   } catch (error) {
     console.warn('Error checking if football match:', error);
     return false;
@@ -92,12 +95,8 @@ const allIrelandSFCGroups: Group[] = [
 
 // Filter matches since May 17th
 function filterMatchesSinceMay17(matches: Match[]): Match[] {
-  const may17 = new Date(2025, 4, 17); // May 17, 2025
-  
-  return matches.filter(match => {
-    const matchDate = parseMatchDate(match);
-    return matchDate >= may17;
-  });
+  // Return all matches instead of filtering by date
+  return matches;
 }
 
 // Helper function to parse date strings for sorting
@@ -167,64 +166,55 @@ function groupMatchesByWeekendAndDay(matches: Match[]): {
       const matchDate = parseMatchDate(match);
       const dayOfWeek = matchDate.getDay();
       
-      // Only process Saturday (6) and Sunday (0) matches
-      if (dayOfWeek !== 6 && dayOfWeek !== 0) {
-        console.warn('Match not on weekend:', match);
-        return;
-      }
-      
-      // For Sunday matches, we need to find the corresponding Saturday
-      let weekendKey: string;
-      if (dayOfWeek === 0) { // Sunday
-        const saturday = new Date(matchDate);
-        saturday.setDate(matchDate.getDate() - 1);
-        weekendKey = saturday.toISOString().split('T')[0];
-      } else { // Saturday
-        weekendKey = matchDate.toISOString().split('T')[0];
-      }
+      // Use the match date as the key
+      const dateKey = matchDate.toISOString().split('T')[0];
       
       // Store weekend dates for later use in descriptions
-      if (!weekendMap[weekendKey]) {
-        const saturday = dayOfWeek === 6 ? matchDate : new Date(matchDate.getTime() - 24 * 60 * 60 * 1000);
-        const sunday = dayOfWeek === 0 ? matchDate : new Date(matchDate.getTime() + 24 * 60 * 60 * 1000);
-        weekendMap[weekendKey] = { saturday, sunday };
+      if (!weekendMap[dateKey]) {
+        weekendMap[dateKey] = { 
+          saturday: matchDate, 
+          sunday: new Date(matchDate.getTime() + 24 * 60 * 60 * 1000) 
+        };
       }
       
-      // Initialize weekend group if needed
-      if (!grouped[weekendKey]) {
-        grouped[weekendKey] = {};
+      // Initialize date group if needed
+      if (!grouped[dateKey]) {
+        grouped[dateKey] = {};
       }
       
       // Add match to appropriate day
-      const dayName = dayOfWeek === 0 ? 'Sunday' : 'Saturday';
-      if (!grouped[weekendKey][dayName]) {
-        grouped[weekendKey][dayName] = [];
+      const dayName = dayOfWeek === 0 ? 'Sunday' : 
+                     dayOfWeek === 6 ? 'Saturday' : 
+                     matchDate.toLocaleDateString('en-US', { weekday: 'long' });
+      
+      if (!grouped[dateKey][dayName]) {
+        grouped[dateKey][dayName] = [];
       }
-      grouped[weekendKey][dayName].push(match);
+      grouped[dateKey][dayName].push(match);
     } catch (error) {
       console.warn('Error grouping match:', error);
     }
   });
   
   // Second pass: Sort matches within each day by time
-  Object.keys(grouped).forEach(weekendKey => {
-    ['Saturday', 'Sunday'].forEach(day => {
-      if (grouped[weekendKey][day]?.length > 0) {
-        grouped[weekendKey][day].sort((a, b) => {
+  Object.keys(grouped).forEach(dateKey => {
+    Object.keys(grouped[dateKey]).forEach(day => {
+      if (grouped[dateKey][day]?.length > 0) {
+        grouped[dateKey][day].sort((a, b) => {
           const timeA = parseMatchDate(a).getTime();
           const timeB = parseMatchDate(b).getTime();
           return timeA - timeB;
         });
-      } else if (grouped[weekendKey][day]) {
+      } else if (grouped[dateKey][day]) {
         // Remove empty days
-        delete grouped[weekendKey][day];
+        delete grouped[dateKey][day];
       }
     });
     
-    // Remove empty weekends
-    if (Object.keys(grouped[weekendKey]).length === 0) {
-      delete grouped[weekendKey];
-      delete weekendMap[weekendKey];
+    // Remove empty dates
+    if (Object.keys(grouped[dateKey]).length === 0) {
+      delete grouped[dateKey];
+      delete weekendMap[dateKey];
     }
   });
   
@@ -1031,6 +1021,8 @@ export default function HomePage() {
         if (!mounted) return;
 
         console.log('Raw data received:', data);
+        console.log('Fixtures in raw data:', data.filter(m => m.isFixture));
+        console.log('Results in raw data:', data.filter(m => !m.isFixture));
 
         if (!data) {
           console.error('No data received');
@@ -1075,6 +1067,8 @@ export default function HomePage() {
         });
 
         console.log('Valid matches found:', validMatches.length);
+        console.log('Valid fixtures found:', validMatches.filter(m => m.isFixture).length);
+        console.log('Valid results found:', validMatches.filter(m => !m.isFixture).length);
 
         if (validMatches.length < data.length) {
           console.warn(`Filtered out ${data.length - validMatches.length} invalid matches`);
@@ -1127,7 +1121,7 @@ export default function HomePage() {
 
   // Get all results and fixtures for current sport
   const allResults = useMemo(() => {
-    return matches
+    const results = matches
       .filter(match => !match.isFixture)
       .filter(match => 
         activeSport === 'hurling' ? isHurlingMatch(match) : isFootballMatch(match)
@@ -1137,19 +1131,34 @@ export default function HomePage() {
         const dateB = parseMatchDate(b);
         return dateB.getTime() - dateA.getTime(); // Newest first for results
       });
+    
+    console.log('All results before sport filter:', matches.filter(m => !m.isFixture));
+    console.log('All results after sport filter:', results);
+    return results;
   }, [matches, activeSport]);
 
   const allFixtures = useMemo(() => {
-    return matches
-      .filter(match => match.isFixture)
-      .filter(match => 
-        activeSport === 'hurling' ? isHurlingMatch(match) : isFootballMatch(match)
-      )
+    console.log('All matches:', matches);
+    const fixtures = matches
+      .filter(match => {
+        console.log('Checking match:', match.competition, 'isFixture:', match.isFixture);
+        return match.isFixture === true;
+      })
+      .filter(match => {
+        const isHurling = isHurlingMatch(match);
+        const isFootball = isFootballMatch(match);
+        console.log('Match:', match.competition, 'Is Hurling:', isHurling, 'Is Football:', isFootball, 'Active Sport:', activeSport);
+        return activeSport === 'hurling' ? isHurling : isFootball;
+      })
       .sort((a, b) => {
         const dateA = parseMatchDate(a);
         const dateB = parseMatchDate(b);
         return dateA.getTime() - dateB.getTime(); // Earliest first for fixtures
       });
+    
+    console.log('All fixtures before sport filter:', matches.filter(m => m.isFixture === true));
+    console.log('All fixtures after sport filter:', fixtures);
+    return fixtures;
   }, [matches, activeSport]);
 
   const { groupedResults, resultsWeekendMap } = useMemo(() => {

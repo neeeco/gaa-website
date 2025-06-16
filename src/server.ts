@@ -205,6 +205,19 @@ app.post('/api/refresh', async (req, res) => {
     }
 });
 
+// Live updates endpoint
+app.get('/api/live-updates', async (req, res) => {
+    try {
+        await initDatabase();
+        const matches = await matchDatabase.getLiveUpdates();
+        console.log('Live updates found:', matches.length);
+        res.json({ matches });
+    } catch (error) {
+        console.error('Error fetching live updates:', error);
+        res.status(500).json({ error: 'Failed to fetch live updates' });
+    }
+});
+
 // Start server
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
@@ -214,4 +227,5 @@ app.listen(port, () => {
     console.log('  GET  /api/stats - Database statistics');
     console.log('  GET  /api/competitions - Available competitions');
     console.log('  POST /api/refresh - Force data refresh');
+    console.log('  GET  /api/live-updates - Get live updates');
 }); 

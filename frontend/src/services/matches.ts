@@ -7,10 +7,17 @@ const API_URL = process.env.NODE_ENV === 'development'
 
 export async function getMatches(isFixture?: boolean): Promise<Match[]> {
   try {
-    const url = isFixture !== undefined 
-      ? `${API_URL}/api/matches?isFixture=${isFixture}`
-      : `${API_URL}/api/matches`;
-      
+    // Check if we need to force a refresh
+    const lastUpdate = localStorage.getItem('lastUpdate');
+    const now = Date.now();
+    const oneHour = 60 * 60 * 1000; // 1 hour in milliseconds
+    
+    // Force refresh if data is older than 1 hour
+    const forceRefresh = !lastUpdate || (now - parseInt(lastUpdate)) > oneHour;
+    
+    // Always fetch all matches, we'll filter on the frontend
+    const url = `${API_URL}/api/matches?forceRefresh=${forceRefresh}`;
+    
     console.log('Fetching matches from:', url);
     const response = await fetch(url, {
       // Add cache control to prevent stale data
@@ -18,7 +25,6 @@ export async function getMatches(isFixture?: boolean): Promise<Match[]> {
       next: { revalidate: 0 }
     });
 
-        
     if (!response.ok) {
       const errorText = await response.text();
       console.error('API error response:', {
@@ -136,6 +142,9 @@ export async function getMatches(isFixture?: boolean): Promise<Match[]> {
     if (validMatches.length < rawMatches.length) {
       console.warn(`Filtered out ${rawMatches.length - validMatches.length} invalid matches`);
     }
+
+    // Update last update time
+    localStorage.setItem('lastUpdate', now.toString());
 
     return validMatches;
   } catch (err) {

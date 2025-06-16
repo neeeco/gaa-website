@@ -45,6 +45,12 @@ if (!fs.existsSync(config.DATA_DIR)) {
 // Load last scrape time from database
 const loadLastScrapeTime = async (): Promise<number> => {
   try {
+    // In development, always return 0 to allow scraping
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Development mode: bypassing rate limit check');
+      return 0;
+    }
+    
     const stats = await matchDatabase.getMatchStats();
     if (stats?.lastUpdated) {
       return new Date(stats.lastUpdated).getTime();
@@ -70,6 +76,12 @@ const saveScrapeTime = () => {
 
 // Check if a scrape is needed
 export const shouldScrape = async (): Promise<boolean> => {
+  // In development, always allow scraping
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Development mode: allowing scrape');
+    return true;
+  }
+  
   const now = Date.now();
   const lastScrape = await loadLastScrapeTime();
   return now - lastScrape >= config.SCRAPE_INTERVAL;
@@ -627,7 +639,72 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
               // Check for broadcasting information
               const broadcasting = match.querySelector('.gar-match-item__broadcasting, .match-broadcast, .fixture-broadcast')?.textContent?.trim() || '';
               
-              const isFixture = !homeScore && !awayScore;
+              // Determine if this is a fixture by checking:
+              // 1. No scores present
+              // 2. Has a time (future match)
+              // 3. Date is in the future
+              const hasNoScores = !homeScore && !awayScore;
+              const hasTime = !!time;
+              
+              // Parse the date correctly
+              const dateMatch = date.match(/(\w+)\s+(\d{1,2})\s+(\w+)/);
+              let matchDate = new Date();
+              
+              if (dateMatch) {
+                const day = parseInt(dateMatch[2]);
+                const monthStr = dateMatch[3]?.toLowerCase() || '';
+                
+                // Map month names to numbers (assuming current year)
+                const monthMap: Record<string, number> = {
+                  'january': 0, 'jan': 0,
+                  'february': 1, 'feb': 1,
+                  'march': 2, 'mar': 2,
+                  'april': 3, 'apr': 3,
+                  'may': 4,
+                  'june': 5, 'jun': 5,
+                  'july': 6, 'jul': 6,
+                  'august': 7, 'aug': 7,
+                  'september': 8, 'sep': 8,
+                  'october': 9, 'oct': 9,
+                  'november': 10, 'nov': 10,
+                  'december': 11, 'dec': 11
+                };
+                
+                const month = monthMap[monthStr] ?? 5; // default to June if not found
+                const year = 2025; // assuming current year
+                
+                // Parse time if available
+                let hour = 12; // default to noon
+                let minute = 0;
+                
+                if (time) {
+                  const timeMatch = time.match(/(\d{1,2}):(\d{2})/);
+                  if (timeMatch) {
+                    hour = parseInt(timeMatch[1]);
+                    minute = parseInt(timeMatch[2]);
+                  }
+                }
+                
+                matchDate = new Date(year, month, day, hour, minute);
+              }
+              
+              const isFutureMatch = matchDate > new Date();
+              
+              // A match is a fixture if:
+              // 1. It has no scores OR
+              // 2. It has a time (scheduled match) OR
+              // 3. It's in the future
+              const isFixture = hasNoScores || hasTime || isFutureMatch;
+              
+              console.log('Match fixture determination:', {
+                date,
+                time,
+                parsedDate: matchDate,
+                hasNoScores,
+                hasTime,
+                isFutureMatch,
+                isFixture
+              });
               
               // Only add the match if we have all required fields
               if (competition && homeTeam && awayTeam && date) {

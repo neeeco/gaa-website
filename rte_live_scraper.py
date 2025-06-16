@@ -72,36 +72,39 @@ def scrape_rte_live_articles():
 
     updates_by_match = {}
     last_minute_by_match = {}
+    print("\n=== Starting RTE Live Scraper ===")
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
 
         for url in urls:
-            print(f"Scraping URL: {url}")  # Debug log
-            page.goto(url, timeout=30000)  # Increased timeout to 30 seconds
-            page.wait_for_selector("span[title]", timeout=5000)  # 5 second timeout for selector
+            print(f"\n📰 Scraping URL: {url}")
+            page.goto(url, timeout=30000)
+            page.wait_for_selector("span[title]", timeout=5000)
 
             titles = page.locator("span[title]")
             count = titles.count()
-            print(f"Found {count} titles")  # Debug log
+            print(f"🔍 Found {count} titles on page")
 
+            live_articles_found = 0
             for i in range(count):
                 try:
-                    # Set a shorter timeout for getting title attributes
-                    title_text = titles.nth(i).get_attribute("title", timeout=5000)  # 5 second timeout for attribute
+                    title_text = titles.nth(i).get_attribute("title", timeout=5000)
                 except Exception as e:
-                    print(f"Skipping title {i} due to error: {e}")
+                    print(f"❌ Error getting title {i}: {e}")
                     continue
-                print(f"Title {i}: {title_text}")  # Debug log
-                # Enhanced title matching to include more keywords
+
                 if title_text and any(keyword in title_text.lower() for keyword in ["live", "recap", "updates", "minute", "score"]):
+                    live_articles_found += 1
+                    print(f"\n📌 Found live article: {title_text}")
+                    
                     article_element = titles.nth(i).locator("xpath=ancestor::a")
                     article_url = article_element.get_attribute("href")
                     if article_url and article_url.startswith("/"):
                         article_url = "https://www.rte.ie" + article_url
 
-                    print(f"Found live article: {article_url}")  # Debug log
+                    print(f"🔗 Article URL: {article_url}")
                     page.goto(article_url)
                     try:
                         page.wait_for_selector(".tracker-post-body", timeout=1000)
@@ -114,54 +117,76 @@ def scrape_rte_live_articles():
                                 else:
                                     break
                             except Exception as e:
-                                print(f"Error clicking 'Show More': {e}")
+                                print(f"ℹ️ No more 'Show More' buttons or error: {e}")
                                 break
+
                         updates = page.locator(".tracker-post-body, .live-update, .match-update")
                         update_count = updates.count()
-                        print(f"Found {update_count} updates in article")  # Debug log
+                        print(f"📊 Found {update_count} updates in article")
+
+                        valid_updates = 0
                         for j in range(update_count):
                             update_text = updates.nth(j).inner_text()
                             info = extract_live_update_info(update_text)
                             if info:
-                                # Only add if time does not go backwards
+                                valid_updates += 1
                                 match_key = None
                                 if info["home_team"] and info["away_team"]:
                                     match_key = generate_match_key(info["home_team"], info["away_team"])
+                                    print(f"🏆 Found match update: {match_key} - Minute {info.get('minute')} - Score: {info.get('home_score')} vs {info.get('away_score')}")
                                 elif info["is_halftime"]:
-                                    # Try to assign halftime to the last match_key if possible
                                     if updates_by_match:
                                         match_key = list(updates_by_match.keys())[-1]
                                     else:
-                                        continue  # Skip if we don't know the teams
-                                else:
-                                    continue  # Skip null/unknown updates
-                                if match_key not in updates_by_match:
-                                    updates_by_match[match_key] = []
-                                    last_minute_by_match[match_key] = -1
-                                # Only add if minute is None (halftime) or >= last
-                                if info["minute"] is None or info["minute"] >= last_minute_by_match[match_key]:
-                                    updates_by_match[match_key].append(info)
-                                    if info["minute"] is not None:
-                                        last_minute_by_match[match_key] = info["minute"]
+                                        continue
+
+                                if match_key:
+                                    if match_key not in updates_by_match:
+                                        updates_by_match[match_key] = []
+                                        last_minute_by_match[match_key] = -1
+                                    if info["minute"] is None or info["minute"] >= last_minute_by_match[match_key]:
+                                        updates_by_match[match_key].append(info)
+                                        if info["minute"] is not None:
+                                            last_minute_by_match[match_key] = info["minute"]
+
+                        print(f"✅ Processed {valid_updates} valid updates from article")
                     except Exception as e:
-                        print(f"Error processing article: {str(e)}")  # Debug log
+                        print(f"❌ Error processing article: {str(e)}")
                         continue
+
+            print(f"\n📈 Summary for {url}:")
+            print(f"- Found {live_articles_found} live articles")
+            print(f"- Total matches found: {len(updates_by_match)}")
 
         browser.close()
 
-        # Instead of saving to JSON, save to Supabase
+        print("\n=== Final Results ===")
+        print(f"Total matches found: {len(updates_by_match)}")
+        for match_key, updates in updates_by_match.items():
+            print(f"\nMatch: {match_key}")
+            print(f"Number of updates: {len(updates)}")
+            if updates:
+                latest = sorted(updates, key=lambda u: (u.get('minute') or 0, u.get('timestamp')))[-1]
+                print(f"Latest update: Minute {latest.get('minute')} - Score: {latest.get('home_score')} vs {latest.get('away_score')}")
+
         try:
             save_live_scores_to_supabase(updates_by_match)
-            print("✅ Saved latest live scores to Supabase")
+            print("\n✅ Successfully saved latest live scores to Supabase")
         except Exception as e:
-            print(f"Error saving live scores to Supabase: {e}")
+            print(f"\n❌ Error saving live scores to Supabase: {e}")
 
 def save_live_scores_to_supabase(updates_by_match):
+    print("\n=== Saving to Supabase ===")
+    total_updates = 0
+    total_matches = 0
+
     # First, save all updates to live_updates table
     for match_key, updates in updates_by_match.items():
         if not updates:
             continue
             
+        total_matches += 1
+        print(f"\nSaving updates for match: {match_key}")
         # Insert all updates
         for update in updates:
             try:
@@ -175,10 +200,14 @@ def save_live_scores_to_supabase(updates_by_match):
                     'is_final': update.get('is_final', False),
                     'timestamp': update.get('timestamp', datetime.now().isoformat())
                 }).execute()
+                total_updates += 1
             except Exception as e:
-                print(f"Error inserting update for {match_key}: {e}")
+                print(f"❌ Error inserting update for {match_key}: {e}")
+
+    print(f"\nSaved {total_updates} updates for {total_matches} matches to live_updates table")
 
     # Then, update the latest scores in live_scores table
+    print("\nUpdating latest scores in live_scores table...")
     for match_key, updates in updates_by_match.items():
         if not updates:
             continue
@@ -195,8 +224,9 @@ def save_live_scores_to_supabase(updates_by_match):
                 'is_final': latest.get('is_final', False),
                 'updated_at': latest.get('timestamp', datetime.now().isoformat())
             }).execute()
+            print(f"✅ Updated latest score for {match_key}")
         except Exception as e:
-            print(f"Error upserting latest score for {match_key}: {e}")
+            print(f"❌ Error upserting latest score for {match_key}: {e}")
 
 if __name__ == "__main__":
     scrape_rte_live_articles()

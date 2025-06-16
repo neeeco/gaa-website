@@ -136,10 +136,17 @@ class MatchDatabase {
           date: String(match.date || '').trim(),
           time: match.time ? String(match.time).trim() : undefined,
           broadcasting: match.broadcasting ? String(match.broadcasting).trim() : undefined,
-          isFixture: Boolean(match.isfixture),
+          isFixture: match.isfixture === true || match.isfixture === 'true' || match.isfixture === 1,
           scrapedAt: match.scrapedat ? String(match.scrapedat) : new Date().toISOString(),
           createdAt: match.createdat ? String(match.createdat) : undefined
         };
+
+        // Log the isFixture value for debugging
+        console.log('Match isFixture value:', {
+          original: match.isfixture,
+          transformed: transformed.isFixture,
+          type: typeof transformed.isFixture
+        });
 
         // Validate required fields
         const requiredFields = ['competition', 'homeTeam', 'awayTeam', 'date', 'isFixture'];
@@ -172,11 +179,26 @@ class MatchDatabase {
   }
 
   async getMatchStats() {
-    const { data, error } = await this.supabase
-      .rpc('get_match_stats');
+    try {
+      const { data, error } = await this.supabase
+        .from('matches')
+        .select('competition, date, isfixture');
 
-    if (error) throw error;
-    return data;
+      if (error) throw error;
+
+      const stats = {
+        total: data.length,
+        fixtures: data.filter(m => m.isfixture).length,
+        results: data.filter(m => !m.isfixture).length,
+        competitions: [...new Set(data.map(m => m.competition))].sort(),
+        lastUpdated: new Date().toISOString()
+      };
+
+      return stats;
+    } catch (error) {
+      console.error('Error getting match stats:', error);
+      throw error;
+    }
   }
 
   async saveLiveUpdate(matchKey: string, update: {
@@ -237,16 +259,42 @@ class MatchDatabase {
     return data;
   }
 
-  async getLiveUpdates(matchKey: string) {
-    const { data, error } = await this.supabase
-      .from('live_updates')
-      .select('*')
-      .eq('match_key', matchKey)
-      .order('timestamp', { ascending: false })
-      .limit(50);
+  async getLiveUpdates() {
+    try {
+      // Get live scores
+      const { data: liveScores, error: liveScoresError } = await this.supabase
+        .from('live_scores')
+        .select('*')
+        .order('updated_at', { ascending: false });
 
-    if (error) throw error;
-    return data;
+      if (liveScoresError) throw liveScoresError;
+
+      // Get live updates
+      const { data: liveUpdates, error: liveUpdatesError } = await this.supabase
+        .from('live_updates')
+        .select('*')
+        .order('timestamp', { ascending: false });
+
+      if (liveUpdatesError) throw liveUpdatesError;
+
+      // Group updates by match
+      const matches = liveScores.map(score => {
+        const updates = liveUpdates.filter(update => update.match_key === score.match_key);
+        return {
+          ...score,
+          updates: updates.sort((a, b) => {
+            const timeA = a.timestamp || '';
+            const timeB = b.timestamp || '';
+            return timeB.localeCompare(timeA);
+          })
+        };
+      });
+
+      return matches;
+    } catch (error) {
+      console.error('Error getting live updates:', error);
+      throw error;
+    }
   }
 
   async deleteOldMatches(daysToKeep: number) {

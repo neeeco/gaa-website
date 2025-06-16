@@ -1,11 +1,6 @@
 import { Match } from '@/types/matches';
 import { getMatches as getSupabaseMatches, getLiveUpdates as getSupabaseLiveUpdates, refreshMatches as refreshSupabaseMatches } from './supabase';
 
-// Use localhost in development, production URL in production
-const API_URL = process.env.NODE_ENV === 'development' 
-  ? 'http://localhost:3001'
-  : process.env.NEXT_PUBLIC_API_URL || 'https://gaa-website-production.up.railway.app';
-
 export async function getMatches(isFixture?: boolean): Promise<Match[]> {
   try {
     return await getSupabaseMatches(isFixture);
@@ -34,7 +29,7 @@ export async function refreshMatches() {
   }
 }
 
-export async function getLiveUpdates(): Promise<any[]> {
+export async function getLiveUpdates(): Promise<Match[]> {
   try {
     return await getSupabaseLiveUpdates();
   } catch (err) {

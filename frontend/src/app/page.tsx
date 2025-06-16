@@ -1010,7 +1010,7 @@ export default function HomePage() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [weekendDatesMap, setWeekendDatesMap] = useState<Record<string, { saturday: Date; sunday: Date }>>({});
   const [mounted, setMounted] = useState(true);
-  const [liveUpdates, setLiveUpdates] = useState<any[]>([]);
+  const [liveUpdates, setLiveUpdates] = useState<Match[]>([]);
 
     const fetchData = async () => {
       try {
@@ -1123,22 +1123,22 @@ export default function HomePage() {
     return () => {
       setMounted(false);
     };
-  }, []);
+  }, [fetchData]);
 
   // Get all results and fixtures for current sport
   const allResults = useMemo(() => {
     const results = matches
-      .filter(match => !match.isFixture)
-      .filter(match => 
+      .filter((match: Match) => !match.isFixture)
+      .filter((match: Match) => 
         activeSport === 'hurling' ? isHurlingMatch(match) : isFootballMatch(match)
       )
-      .sort((a, b) => {
+      .sort((a: Match, b: Match) => {
         const dateA = parseMatchDate(a);
         const dateB = parseMatchDate(b);
         return dateB.getTime() - dateA.getTime(); // Newest first for results
       });
     
-    console.log('All results before sport filter:', matches.filter(m => !m.isFixture));
+    console.log('All results before sport filter:', matches.filter((m: Match) => !m.isFixture));
     console.log('All results after sport filter:', results);
     return results;
   }, [matches, activeSport]);
@@ -1146,23 +1146,23 @@ export default function HomePage() {
   const allFixtures = useMemo(() => {
     console.log('All matches:', matches);
     const fixtures = matches
-      .filter(match => {
+      .filter((match: Match) => {
         console.log('Checking match:', match.competition, 'isFixture:', match.isFixture);
         return match.isFixture === true;
       })
-      .filter(match => {
+      .filter((match: Match) => {
         const isHurling = isHurlingMatch(match);
         const isFootball = isFootballMatch(match);
         console.log('Match:', match.competition, 'Is Hurling:', isHurling, 'Is Football:', isFootball, 'Active Sport:', activeSport);
         return activeSport === 'hurling' ? isHurling : isFootball;
       })
-      .sort((a, b) => {
+      .sort((a: Match, b: Match) => {
         const dateA = parseMatchDate(a);
         const dateB = parseMatchDate(b);
         return dateA.getTime() - dateB.getTime(); // Earliest first for fixtures
       });
     
-    console.log('All fixtures before sport filter:', matches.filter(m => m.isFixture === true));
+    console.log('All fixtures before sport filter:', matches.filter((m: Match) => m.isFixture === true));
     console.log('All fixtures after sport filter:', fixtures);
     return fixtures;
   }, [matches, activeSport]);
@@ -1453,9 +1453,10 @@ export default function HomePage() {
                 <div className="space-y-4">
                   {(() => {
                     // Only All-Ireland senior matches
-                    const isAllIrelandSenior = (u: any) => {
-                      const comp = u.competition?.toLowerCase() || '';
-                      return comp.includes('all-ireland') && comp.includes('senior') && !comp.includes('minor') && !comp.includes('junior');
+                    const isAllIrelandSenior = (match: Match) => {
+                      return match.competition.toLowerCase().includes('all-ireland') && 
+                             !match.competition.toLowerCase().includes('minor') &&
+                             !match.competition.toLowerCase().includes('u20');
                     };
                     const football = liveUpdates.filter(u => isAllIrelandSenior(u) && isFootballMatch(u));
                     const hurling = liveUpdates.filter(u => isAllIrelandSenior(u) && isHurlingMatch(u));

@@ -1023,6 +1023,12 @@ export default function HomePage() {
         console.log('Raw data received:', data);
         console.log('Fixtures in raw data:', data.filter(m => m.isFixture));
         console.log('Results in raw data:', data.filter(m => !m.isFixture));
+        console.log('Detailed fixture check:', data.map(m => ({
+          competition: m.competition,
+          isFixture: m.isFixture,
+          isFixtureType: typeof m.isFixture,
+          rawValue: m.isFixture
+        })));
 
         if (!data) {
           console.error('No data received');

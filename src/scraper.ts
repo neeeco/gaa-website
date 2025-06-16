@@ -810,7 +810,42 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
         throw error;
       }
       
-      return allMatches;
+      // Process each match
+      const processedMatches = allMatches.map(match => {
+        const isFixture = !match.homeScore && !match.awayScore; // If there's no score, it's a fixture
+        console.log('Processing match:', {
+          homeTeam: match.homeTeam,
+          awayTeam: match.awayTeam,
+          date: match.date,
+          hasScore: !!match.homeScore || !!match.awayScore,
+          isFixture: isFixture
+        });
+        
+        return {
+          competition: match.competition,
+          homeTeam: match.homeTeam,
+          awayTeam: match.awayTeam,
+          date: match.date,
+          homeScore: match.homeScore || null,
+          awayScore: match.awayScore || null,
+          venue: match.venue,
+          referee: match.referee,
+          time: match.time,
+          broadcasting: match.broadcasting,
+          scrapedAt: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+          isFixture: isFixture
+        };
+      });
+
+      console.log('Processed matches summary:');
+      console.log('Total matches:', processedMatches.length);
+      console.log('Fixtures:', processedMatches.filter(m => m.isFixture).length);
+      console.log('Results:', processedMatches.filter(m => !m.isFixture).length);
+      console.log('Sample fixture:', processedMatches.find(m => m.isFixture));
+      console.log('Sample result:', processedMatches.find(m => !m.isFixture));
+      
+      return processedMatches;
       
     } catch (error) {
       console.error('Error scraping GAA fixtures and results:', error);

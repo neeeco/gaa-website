@@ -56,32 +56,72 @@ class MatchDatabase {
   }
 
   async saveMatches(matches: Match[]) {
-    try {
-      for (const match of matches) {
-        const { error } = await this.supabase
-          .from('matches')
-          .upsert({
-            competition: match.competition,
-            hometeam: match.homeTeam,
-            awayteam: match.awayTeam,
-            homescore: match.homeScore,
-            awayscore: match.awayScore,
-            venue: match.venue,
-            referee: match.referee,
-            date: match.date,
-            time: match.time,
-            broadcasting: match.broadcasting,
-            isfixture: match.isFixture,
-            scrapedat: match.scrapedAt || new Date().toISOString()
-          }, {
-            onConflict: 'hometeam,awayteam,date,competition'
-          });
+    console.log('Saving matches to database...');
+    console.log('Sample match before save:', matches[0]);
+    console.log('Number of matches to save:', matches.length);
+    console.log('Number of fixtures:', matches.filter(m => m.isFixture).length);
+    console.log('Number of results:', matches.filter(m => !m.isFixture).length);
 
-        if (error) throw error;
-      }
-    } catch (error) {
+    // Log a sample of the data being saved
+    const sampleData = matches.slice(0, 2).map(match => ({
+      competition: match.competition,
+      hometeam: match.homeTeam,
+      awayteam: match.awayTeam,
+      date: match.date,
+      homescore: match.homeScore,
+      awayscore: match.awayScore,
+      venue: match.venue,
+      referee: match.referee,
+      time: match.time,
+      broadcasting: match.broadcasting,
+      scrapedat: match.scrapedAt,
+      createdat: match.createdAt,
+      isfixture: match.isFixture
+    }));
+    console.log('Sample data being saved:', sampleData);
+
+    const { data, error } = await this.supabase
+      .from('matches')
+      .upsert(
+        matches.map(match => ({
+          competition: match.competition,
+          hometeam: match.homeTeam,
+          awayteam: match.awayTeam,
+          date: match.date,
+          homescore: match.homeScore,
+          awayscore: match.awayScore,
+          venue: match.venue,
+          referee: match.referee,
+          time: match.time,
+          broadcasting: match.broadcasting,
+          scrapedat: match.scrapedAt,
+          createdat: match.createdAt,
+          isfixture: match.isFixture
+        })),
+        { onConflict: 'competition,hometeam,awayteam,date' }
+      );
+
+    if (error) {
+      console.error('Error saving matches:', error);
       throw error;
     }
+
+    console.log('Successfully saved matches to database');
+    console.log('Sample saved match:', data?.[0]);
+    
+    // Verify the data was saved by querying it back
+    const { data: verifyData, error: verifyError } = await this.supabase
+      .from('matches')
+      .select('*')
+      .limit(2);
+
+    if (verifyError) {
+      console.error('Error verifying saved data:', verifyError);
+    } else {
+      console.log('Verification query results:', verifyData);
+    }
+
+    return data;
   }
 
   async getMatches(options: { isFixture?: boolean; competition?: string } = {}) {

@@ -1012,6 +1012,9 @@ export default function HomePage() {
   const [mounted, setMounted] = useState(true);
   const [liveUpdates, setLiveUpdates] = useState<Match[]>([]);
 
+  useEffect(() => {
+    setMounted(true);
+    
     const fetchData = async () => {
       try {
         console.log('Fetching matches...');
@@ -1117,13 +1120,11 @@ export default function HomePage() {
       }
     };
 
-  useEffect(() => {
-    setMounted(true);
     fetchData();
     return () => {
       setMounted(false);
     };
-  }, [fetchData]);
+  }, []); // Empty dependency array since fetchData is now inside useEffect
 
   // Get all results and fixtures for current sport
   const allResults = useMemo(() => {
@@ -1472,30 +1473,30 @@ export default function HomePage() {
                             </div>
                             <div className="space-y-4">
                               {football.map((u, i) => (
-                                <div key={`football-${u.match_key}-${i}`} className="bg-white rounded-lg shadow-sm border border-gray-200">
+                                <div key={`football-${u.competition}-${i}`} className="bg-white rounded-lg shadow-sm border border-gray-200">
                                   <div className="p-4">
                                     <div className="flex items-center justify-between mb-2">
                                       <div className="text-sm text-gray-500">{u.competition}</div>
-                                      {u.is_final ? (
+                                      {u.isFixture ? (
                                         <span className="bg-gray-700 text-white text-xs px-2 py-1 rounded-full font-bold">FT</span>
                                       ) : (
-                                        <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full font-bold">LIVE {u.minute}'</span>
+                                        <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full font-bold">LIVE {u.time || ''}</span>
                                       )}
                                     </div>
                                     <div className="flex items-center justify-between">
                                       <div className="flex items-center gap-3 flex-1">
                                         <div className="w-8 h-8">
-                                          <Image src={getTeamLogo(u.home_team)} alt={`${u.home_team} logo`} width={32} height={32} className="object-contain" />
+                                          <Image src={getTeamLogo(u.homeTeam)} alt={`${u.homeTeam} logo`} width={32} height={32} className="object-contain" />
                                         </div>
-                                        <span className="font-medium text-gray-900">{u.home_team}</span>
+                                        <span className="font-medium text-gray-900">{u.homeTeam}</span>
                                       </div>
                                       <div className="px-4">
-                                        <span className="font-bold text-gray-900">{u.home_score} - {u.away_score}</span>
+                                        <span className="font-bold text-gray-900">{u.homeScore} - {u.awayScore}</span>
                                       </div>
                                       <div className="flex items-center gap-3 flex-1 justify-end">
-                                        <span className="font-medium text-gray-900">{u.away_team}</span>
+                                        <span className="font-medium text-gray-900">{u.awayTeam}</span>
                                         <div className="w-8 h-8">
-                                          <Image src={getTeamLogo(u.away_team)} alt={`${u.away_team} logo`} width={32} height={32} className="object-contain" />
+                                          <Image src={getTeamLogo(u.awayTeam)} alt={`${u.awayTeam} logo`} width={32} height={32} className="object-contain" />
                                         </div>
                                       </div>
                                     </div>
@@ -1512,30 +1513,30 @@ export default function HomePage() {
                             </div>
                             <div className="space-y-4">
                               {hurling.map((u, i) => (
-                                <div key={`hurling-${u.match_key}-${i}`} className="bg-white rounded-lg shadow-sm border border-gray-200">
+                                <div key={`hurling-${u.competition}-${i}`} className="bg-white rounded-lg shadow-sm border border-gray-200">
                                   <div className="p-4">
                                     <div className="flex items-center justify-between mb-2">
                                       <div className="text-sm text-gray-500">{u.competition}</div>
-                                      {u.is_final ? (
+                                      {u.isFixture ? (
                                         <span className="bg-gray-700 text-white text-xs px-2 py-1 rounded-full font-bold">FT</span>
                                       ) : (
-                                        <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full font-bold">LIVE {u.minute}'</span>
+                                        <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full font-bold">LIVE {u.time || ''}</span>
                                       )}
                                     </div>
                                     <div className="flex items-center justify-between">
                                       <div className="flex items-center gap-3 flex-1">
                                         <div className="w-8 h-8">
-                                          <Image src={getTeamLogo(u.home_team)} alt={`${u.home_team} logo`} width={32} height={32} className="object-contain" />
+                                          <Image src={getTeamLogo(u.homeTeam)} alt={`${u.homeTeam} logo`} width={32} height={32} className="object-contain" />
                                         </div>
-                                        <span className="font-medium text-gray-900">{u.home_team}</span>
+                                        <span className="font-medium text-gray-900">{u.homeTeam}</span>
                                       </div>
                                       <div className="px-4">
-                                        <span className="font-bold text-gray-900">{u.home_score} - {u.away_score}</span>
+                                        <span className="font-bold text-gray-900">{u.homeScore} - {u.awayScore}</span>
                                       </div>
                                       <div className="flex items-center gap-3 flex-1 justify-end">
-                                        <span className="font-medium text-gray-900">{u.away_team}</span>
+                                        <span className="font-medium text-gray-900">{u.awayTeam}</span>
                                         <div className="w-8 h-8">
-                                          <Image src={getTeamLogo(u.away_team)} alt={`${u.away_team} logo`} width={32} height={32} className="object-contain" />
+                                          <Image src={getTeamLogo(u.awayTeam)} alt={`${u.awayTeam} logo`} width={32} height={32} className="object-contain" />
                                         </div>
                                       </div>
                                     </div>

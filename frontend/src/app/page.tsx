@@ -255,64 +255,7 @@ function getSimplifiedVenue(venue?: string | null): string {
 }
 
 // Helper function to get date description
-function getDateDescription(match: Match): { text: string; showTime: boolean } {
-  const matchDate = parseMatchDate(match);
-  const today = new Date();
-  const tomorrow = new Date(today);
-  tomorrow.setDate(today.getDate() + 1);
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-  
-  // Only format time if it exists in the match data
-  const hasTime = Boolean(match.time && match.time.trim());
-  const timeStr = hasTime ? matchDate.toLocaleTimeString('en-IE', { 
-    hour: '2-digit', 
-    minute: '2-digit',
-    hour12: false 
-  }) : '';
-  
-  // Check if it's today, tomorrow, or yesterday
-  const isToday = matchDate.toDateString() === today.toDateString();
-  const isTomorrow = matchDate.toDateString() === tomorrow.toDateString();
-  const isYesterday = matchDate.toDateString() === yesterday.toDateString();
-  
-  // For today's matches
-  if (isToday) {
-    return { 
-      text: hasTime ? `Today, ${timeStr}` : 'Today', 
-      showTime: hasTime 
-    };
-  }
-  
-  // For tomorrow's matches
-  if (isTomorrow) {
-    return { 
-      text: hasTime ? `Tomorrow, ${timeStr}` : 'Tomorrow', 
-      showTime: hasTime 
-    };
-  }
-  
-  // For yesterday's matches
-  if (isYesterday) {
-    return { 
-      text: hasTime ? `Yesterday, ${timeStr}` : 'Yesterday', 
-      showTime: hasTime 
-    };
-  }
-  
-  // For all other matches, show date and time with ordinal suffix
-  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  
-  const dayName = dayNames[matchDate.getDay()];
-  const day = addOrdinalSuffix(matchDate.getDate());
-  const monthName = monthNames[matchDate.getMonth()];
-  
-  return { 
-    text: hasTime ? `${dayName} ${day} ${monthName}, ${timeStr}` : `${dayName} ${day} ${monthName}`,
-    showTime: hasTime 
-  };
-}
+// getDateDescription function removed as it was not being used
 
 // Helper function to check if a match is live
 function isMatchLive(match: Match): boolean {

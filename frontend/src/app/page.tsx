@@ -1124,7 +1124,7 @@ export default function HomePage() {
     return () => {
       setMounted(false);
     };
-  }, []); // Empty dependency array since fetchData is now inside useEffect
+  }, [mounted]); // Add mounted to the dependency array
 
   // Get all results and fixtures for current sport
   const allResults = useMemo(() => {

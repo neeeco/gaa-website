@@ -45,7 +45,7 @@ NODE_ENV=development
 
 4. Initialize the database:
 ```bash
-npx ts-node src/scraper.ts
+npx ts-node src/scripts/scraper/scraper.ts
 ```
 
 5. Start the development server:

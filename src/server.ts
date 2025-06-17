@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { scrapeGAAFixturesAndResults } from './scraper';
+import { scrapeGAAFixturesAndResults } from './scripts/scraper/scraper';
 import { matchDatabase, type Match } from './database';
 
 const app = express();
@@ -15,6 +15,7 @@ let dbInitialized = false;
 async function initDatabase() {
     if (!dbInitialized) {
         try {
+            console.log('\n=== Initializing Database ===');
             // Add timeout to database initialization
             const timeout = new Promise((_, reject) => 
                 setTimeout(() => reject(new Error('Database initialization timeout')), 30000)
@@ -26,10 +27,10 @@ async function initDatabase() {
             ]);
             
             dbInitialized = true;
-            console.log('Database initialized successfully');
+            console.log('Database initialized successfully\n');
         } catch (error) {
             console.error('Failed to initialize database:', error);
-            throw error; // We want to fail if DB init fails
+            throw error;
         }
     }
 }
@@ -61,7 +62,7 @@ async function getMatches(options: {
 
     // If no data in DB or force refresh, try fresh scraping
     try {
-        console.log('Attempting fresh scrape');
+        console.log('\n=== Starting Fresh Scrape ===');
         const scrapedMatches = await scrapeGAAFixturesAndResults();
         
         if (scrapedMatches.length > 0) {
@@ -145,7 +146,8 @@ app.get('/api/stats', async (req, res) => {
 app.get('/api/matches', async (req, res) => {
     try {
         const { isFixture, competition, forceRefresh } = req.query;
-        console.log('Received request for matches with params:', { isFixture, competition, forceRefresh });
+        console.log('\n=== Match Request ===');
+        console.log('Parameters:', { isFixture, competition, forceRefresh });
         
         const matches = await getMatches({
             isFixture: isFixture === 'true',
@@ -153,26 +155,8 @@ app.get('/api/matches', async (req, res) => {
             forceRefresh: forceRefresh === 'true'
         });
         
-        console.log('Raw matches from database:', JSON.stringify(matches, null, 2));
-        
-        // Ensure all required fields are present and properly formatted
-        const validatedMatches = matches.map(match => ({
-            competition: String(match.competition || '').trim(),
-            homeTeam: String(match.homeTeam || '').trim(),
-            awayTeam: String(match.awayTeam || '').trim(),
-            date: String(match.date || '').trim(),
-            homeScore: match.homeScore ? String(match.homeScore).trim() : undefined,
-            awayScore: match.awayScore ? String(match.awayScore).trim() : undefined,
-            venue: match.venue ? String(match.venue).trim() : undefined,
-            referee: match.referee ? String(match.referee).trim() : undefined,
-            time: match.time ? String(match.time).trim() : undefined,
-            broadcasting: match.broadcasting ? String(match.broadcasting).trim() : undefined,
-            isFixture: Boolean(match.isFixture),
-            scrapedAt: match.scrapedAt || new Date().toISOString()
-        }));
-        
-        console.log('Validated matches:', JSON.stringify(validatedMatches, null, 2));
-        res.json(validatedMatches);
+        console.log(`Returning ${matches.length} matches\n`);
+        res.json(matches);
     } catch (error) {
         console.error('Error fetching matches:', error);
         res.status(500).json({ error: 'Failed to fetch matches' });
@@ -194,7 +178,9 @@ app.get('/api/competitions', async (req, res) => {
 // Force refresh endpoint
 app.post('/api/refresh', async (req, res) => {
     try {
+        console.log('\n=== Force Refresh Requested ===');
         const matches = await getMatches({ forceRefresh: true });
+        console.log(`Refresh completed: ${matches.length} matches updated\n`);
         res.json({ 
             message: 'Data refreshed successfully',
             count: matches.length
@@ -219,13 +205,24 @@ app.get('/api/live-updates', async (req, res) => {
 });
 
 // Start server
-app.listen(port, () => {
+app.listen(port, async () => {
+    console.log('\n=== GAA Website Server ===');
     console.log(`Server is running on port ${port}`);
-    console.log('Available endpoints:');
+    console.log('\nAvailable endpoints:');
     console.log('  GET  /health - Health check with database status');
     console.log('  GET  /api/matches - Get matches (with database fallback)');
     console.log('  GET  /api/stats - Database statistics');
     console.log('  GET  /api/competitions - Available competitions');
     console.log('  POST /api/refresh - Force data refresh');
-    console.log('  GET  /api/live-updates - Get live updates');
+    console.log('  GET  /api/live-updates - Get live updates\n');
+
+    // Run initial scrape
+    try {
+        console.log('\n=== Running Initial Scrape ===');
+        await initDatabase();
+        const matches = await getMatches({ forceRefresh: true });
+        console.log(`Initial scrape completed: ${matches.length} matches found\n`);
+    } catch (error) {
+        console.error('Initial scrape failed:', error);
+    }
 }); 

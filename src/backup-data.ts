@@ -1,4 +1,4 @@
-import { scrapeGAAFixturesAndResults } from './scraper';
+import { scrapeGAAFixturesAndResults } from './scripts/scraper/scraper';
 import { matchDatabase } from './database';
 
 async function backupData() {

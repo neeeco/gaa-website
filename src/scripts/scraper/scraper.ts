@@ -1,10 +1,14 @@
 // GAA Fixtures and Results Scraper
 // Updated: June 6th, 2025 - Using database for scrape history
 import { chromium } from 'playwright';
-import { matchDatabase } from './database';
+import { matchDatabase } from '../../database';
 import fs from 'fs';
 import path from 'path';
 import 'dotenv/config';
+
+console.log('\n=== Scraper Module Loading ===');
+console.log('Current working directory:', process.cwd());
+console.log('Environment:', process.env.NODE_ENV || 'development');
 
 interface Match {
   competition: string;
@@ -121,18 +125,20 @@ const debug = (message: string, data?: any) => {
 };
 
 export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
+  console.log('\n=== GAA Scraper Started ===');
+  console.log('Initializing scraper...');
+  
   try {
     // Initialize database first
-    debug('Starting database initialization...');
+    console.log('Initializing database...');
     await matchDatabase.init();
-    debug('Database initialization completed');
+    console.log('Database initialized successfully');
     
     // Rate limiting check - skip in development
     if (process.env.NODE_ENV !== 'development') {
-      debug('Checking rate limits...');
+      console.log('Checking rate limits...');
       const now = Date.now();
       const lastScrape = await loadLastScrapeTime();
-      debug('Last scrape time:', { lastScrape, now });
       
       if (now - lastScrape < config.SCRAPE_INTERVAL && lastScrapeTime === 0) {
         const nextScrapeTime = new Date(lastScrape + config.SCRAPE_INTERVAL);
@@ -140,11 +146,11 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
       }
     }
 
-    debug('Starting fresh scrape...');
+    console.log('Starting fresh scrape...');
     lastScrapeTime = Date.now();
     saveScrapeTime();
 
-    console.log('Starting browser with enhanced stealth configuration...');
+    console.log('Launching browser...');
     
     // Randomly select user agent
     const userAgent = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
@@ -172,15 +178,16 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
       ]
     });
     
+    console.log('Browser launched successfully');
+    
     const context = await browser.newContext({
-      viewport: { width: 1366, height: 768 }, // Common resolution
+      viewport: { width: 1366, height: 768 },
       userAgent,
-      locale: 'en-IE', // Irish locale for GAA site
+      locale: 'en-IE',
       timezoneId: 'Europe/Dublin',
       deviceScaleFactor: 1,
       hasTouch: false,
       isMobile: false,
-      // Enhanced HTTP headers to appear more like a real browser
       extraHTTPHeaders: {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
         'Accept-Language': 'en-IE,en;q=0.9,en-US;q=0.8',
@@ -196,49 +203,7 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
       }
     });
 
-    // Enhanced stealth scripts
-    await context.addInitScript(() => {
-      // Remove webdriver property
-      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-      
-      // Mock plugins
-      Object.defineProperty(navigator, 'plugins', {
-        get: () => [
-          { name: 'Chrome PDF Plugin', length: 1 },
-          { name: 'Chrome PDF Viewer', length: 1 },
-          { name: 'Native Client', length: 1 }
-        ],
-      });
-      
-      // Mock languages
-      Object.defineProperty(navigator, 'languages', { 
-        get: () => ['en-IE', 'en', 'en-US'] 
-      });
-      
-      // Mock permissions
-      if (window.navigator.permissions) {
-        const originalQuery = window.navigator.permissions.query;
-        window.navigator.permissions.query = (parameters: any) => (
-          parameters.name === 'notifications' ?
-            Promise.resolve({ state: Notification.permission, name: 'notifications', onchange: null } as PermissionStatus) :
-            originalQuery(parameters)
-        );
-      }
-      
-      // Mock webgl
-      if (typeof WebGLRenderingContext !== 'undefined') {
-        const getParameter = WebGLRenderingContext.prototype.getParameter;
-        WebGLRenderingContext.prototype.getParameter = function(parameter: any) {
-          if (parameter === 37445) {
-            return 'Intel Inc.';
-          }
-          if (parameter === 37446) {
-            return 'Intel Iris OpenGL Engine';
-          }
-          return getParameter.call(this, parameter);
-        };
-      }
-    });
+    console.log('Browser context created');
 
     const page = await context.newPage();
     
@@ -253,15 +218,16 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
     });
     
     try {
-      console.log('Navigating to GAA website...');
+      console.log('\nNavigating to GAA website...');
       
-      // Add random delay before navigation
       await page.waitForTimeout(randomDelay(2000, 5000));
       
       await page.goto('https://www.gaa.ie/fixtures-results', { 
         waitUntil: 'domcontentloaded',
         timeout: config.SCRAPE_TIMEOUT
       });
+      
+      console.log('Page loaded successfully');
       
       // Take a screenshot right after page load if debug is enabled
       if (config.DEBUG) {
@@ -502,110 +468,113 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
       let allMatches: any[] = [];
       let clickCount = 0;
       let lastMatchCount = 0;
+      let noNewMatchesCount = 0;
+      const MAX_NO_NEW_MATCHES = 3;
+
+      console.log('\n=== Starting Match Collection ===');
+      console.log('--------------------------------');
 
       while (true) {
         try {
+          console.log(`\nProcessing page ${clickCount + 1}...`);
+          
           // Get current matches
           const currentMatches = await page.evaluate(() => {
             const matches: any[] = [];
+            let processedCount = 0;
+            let exampleMatch = null;
+            let earliestDate = null;
+            let latestDate = null;
+            
             document.querySelectorAll('.gar-match-item').forEach(match => {
-              // Debug: Log the entire match HTML
-              console.log('Full match HTML:', match.outerHTML);
-              
               const competition = match.closest('.gar-matches-list__group')?.querySelector('.gar-matches-list__group-name')?.textContent?.trim() || '';
               const date = match.closest('.gar-matches-list__day')?.querySelector('.gar-matches-list__date')?.textContent?.trim() || '';
               
-              // Extract team names with enhanced debugging
+              // Track date range
+              if (date) {
+                if (!earliestDate || date < earliestDate) earliestDate = date;
+                if (!latestDate || date > latestDate) latestDate = date;
+              }
+
+              // Extract team names with improved handling for tournament progression
               let homeTeam = '';
               let awayTeam = '';
               
-              // Debug: Log the entire match HTML first
-              console.log('Full match HTML:', match.outerHTML);
-              console.log('Attempting to extract team names for match:', { competition, date });
-              
               // Method 1: Try direct team name class
               const teamNameElements = match.querySelectorAll('.gar-match-item__team-name');
-              console.log('Found team name elements:', Array.from(teamNameElements).map(el => ({
-                  html: el.outerHTML,
-                  text: el.textContent?.trim(),
-                  parentClass: el.parentElement?.className
-              })));
-              
               if (teamNameElements.length >= 2) {
-                  homeTeam = teamNameElements[0].textContent?.trim() || '';
-                  awayTeam = teamNameElements[1].textContent?.trim() || '';
-                  console.log('Found teams using team-name class:', { homeTeam, awayTeam });
+                homeTeam = teamNameElements[0].textContent?.trim() || '';
+                awayTeam = teamNameElements[1].textContent?.trim() || '';
               }
               
               // Method 2: Try home/away team elements if Method 1 failed
               if (!homeTeam || !awayTeam) {
-                  console.log('Trying home/away team selectors...');
-                  const homeTeamElement = match.querySelector('.gar-match-item__team.-home');
-                  const awayTeamElement = match.querySelector('.gar-match-item__team.-away');
+                const homeTeamElement = match.querySelector('.gar-match-item__team.-home');
+                const awayTeamElement = match.querySelector('.gar-match-item__team.-away');
+                
+                if (homeTeamElement && awayTeamElement) {
+                  const homeNameEl = homeTeamElement.querySelector('.gar-match-item__team-name');
+                  const awayNameEl = awayTeamElement.querySelector('.gar-match-item__team-name');
                   
-                  console.log('Found team elements:', {
-                      home: homeTeamElement ? {
-                          html: homeTeamElement.outerHTML,
-                          text: homeTeamElement.textContent?.trim(),
-                          children: Array.from(homeTeamElement?.children || []).map(el => ({
-                              class: el.className,
-                              text: el.textContent?.trim()
-                          }))
-                      } : 'No home team found',
-                      away: awayTeamElement ? {
-                          html: awayTeamElement.outerHTML,
-                          text: awayTeamElement.textContent?.trim(),
-                          children: Array.from(awayTeamElement?.children || []).map(el => ({
-                              class: el.className,
-                              text: el.textContent?.trim()
-                          }))
-                      } : 'No away team found'
-                  });
-                  
-                  if (homeTeamElement && awayTeamElement) {
-                      // Try to find team names within these elements
-                      const homeNameEl = homeTeamElement.querySelector('.gar-match-item__team-name');
-                      const awayNameEl = awayTeamElement.querySelector('.gar-match-item__team-name');
-                      
-                      if (homeNameEl && awayNameEl) {
-                          homeTeam = homeNameEl.textContent?.trim() || '';
-                          awayTeam = awayNameEl.textContent?.trim() || '';
-                          console.log('Found teams using nested team-name class:', { homeTeam, awayTeam });
-                      } else {
-                          // Fallback to full element text if no specific team name element found
-                          homeTeam = homeTeamElement.textContent?.trim() || '';
-                          awayTeam = awayTeamElement.textContent?.trim() || '';
-                          console.log('Found teams using full element text:', { homeTeam, awayTeam });
-                      }
+                  if (homeNameEl && awayNameEl) {
+                    homeTeam = homeNameEl.textContent?.trim() || '';
+                    awayTeam = awayNameEl.textContent?.trim() || '';
+                  } else {
+                    homeTeam = homeTeamElement.textContent?.trim() || '';
+                    awayTeam = awayTeamElement.textContent?.trim() || '';
                   }
+                }
+              }
+              
+              // Method 3: Look for tournament progression terms
+              if (!homeTeam || !awayTeam) {
+                const teamElements = match.querySelectorAll('.gar-match-item__team');
+                if (teamElements.length >= 2) {
+                  const homeText = teamElements[0].textContent?.trim() || '';
+                  const awayText = teamElements[1].textContent?.trim() || '';
+                  
+                  // Check for tournament progression terms
+                  const progressionTerms = [
+                    'Preliminary Quarter-Final Winner',
+                    'Quarter-Final Winner',
+                    'Semi-Final Winner',
+                    'Final Winner'
+                  ];
+                  
+                  homeTeam = progressionTerms.find(term => homeText.includes(term)) || homeText;
+                  awayTeam = progressionTerms.find(term => awayText.includes(term)) || awayText;
+                }
               }
               
               // Clean team names
               const cleanTeamName = (name: string) => {
-                  return name
-                      .replace(/\d+[-–]\d+/g, '') // Remove scores
-                      .replace(/\(\d+[-–]\d+\)/g, '') // Remove scores in parentheses
-                      .replace(/^\W+|\W+$/g, '') // Remove leading/trailing non-word chars
-                      .trim();
+                if (!name) return '';
+                
+                // First check for tournament progression terms
+                const progressionTerms = [
+                  'Preliminary Quarter-Final Winner',
+                  'Quarter-Final Winner',
+                  'Semi-Final Winner',
+                  'Final Winner'
+                ];
+                
+                const foundTerm = progressionTerms.find(term => name.includes(term));
+                if (foundTerm) return foundTerm;
+                
+                // If no progression term found, clean the name normally
+                return name
+                  .replace(/\d+[-–]\d+/g, '') // Remove scores
+                  .replace(/\(\d+[-–]\d+\)/g, '') // Remove scores in parentheses
+                  .replace(/^\W+|\W+$/g, '') // Remove leading/trailing non-word chars
+                  .trim();
               };
               
               homeTeam = cleanTeamName(homeTeam);
               awayTeam = cleanTeamName(awayTeam);
               
-              // Log final team names
-              console.log('Final team names:', { homeTeam, awayTeam });
-              
-              // Skip this match if we couldn't find valid team names
-              if (!homeTeam || !awayTeam || homeTeam === awayTeam) {
-                  console.warn('Invalid team names found:', {
-                      matchHTML: match.outerHTML,
-                      matchText: match.textContent?.trim(),
-                      competition,
-                      date,
-                      homeTeam,
-                      awayTeam
-                  });
-                  return null;
+              // Skip this match if we couldn't find any team information
+              if (!homeTeam && !awayTeam) {
+                return;
               }
               
               let homeScore = null;
@@ -639,10 +608,7 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
               // Check for broadcasting information
               const broadcasting = match.querySelector('.gar-match-item__broadcasting, .match-broadcast, .fixture-broadcast')?.textContent?.trim() || '';
               
-              // Determine if this is a fixture by checking:
-              // 1. No scores present
-              // 2. Has a time (future match)
-              // 3. Date is in the future
+              // Determine if this is a fixture
               const hasNoScores = !homeScore && !awayScore;
               const hasTime = !!time;
               
@@ -689,60 +655,42 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
               }
               
               const isFutureMatch = matchDate > new Date();
-              
-              // A match is a fixture if:
-              // 1. It has no scores OR
-              // 2. It has a time (scheduled match) OR
-              // 3. It's in the future
               const isFixture = hasNoScores || hasTime || isFutureMatch;
               
-              console.log('Match fixture determination:', {
+              const matchData = {
+                competition,
+                homeTeam,
+                awayTeam,
+                homeScore,
+                awayScore,
+                venue,
+                referee,
                 date,
                 time,
-                parsedDate: matchDate,
-                hasNoScores,
-                hasTime,
-                isFutureMatch,
-                isFixture
-              });
+                isFixture,
+                broadcasting
+              };
               
-              // Only add the match if we have all required fields
-              if (competition && homeTeam && awayTeam && date) {
-                  const matchData = {
-                      competition,
-                      date,
-                      homeTeam,
-                      awayTeam,
-                      homeScore,
-                      awayScore,
-                      venue,
-                      referee,
-                      time,
-                      broadcasting,
-                      isFixture,
-                      scrapedAt: new Date().toISOString()
-                  };
-                  
-                  console.log('Successfully extracted match data:', matchData);
-                  matches.push(matchData);
-              } else {
-                  console.warn('Skipping match due to missing required fields:', { 
-                      competition, 
-                      homeTeam, 
-                      awayTeam, 
-                      date,
-                      matchHTML: match.outerHTML 
-                  });
+              // Store first match as example
+              if (processedCount === 0) {
+                exampleMatch = matchData;
               }
+              
+              matches.push(matchData);
+              processedCount++;
             });
             
-            return matches;
+            // Log only the count and example
+            console.log(`Processed ${processedCount} matches. Example match:`, exampleMatch);
+            
+            return {
+              matches,
+              dateRange: { earliestDate, latestDate }
+            };
           });
 
-          console.log(`Found ${currentMatches.length} matches on current page`);
-
           // Add new matches to our collection, avoiding duplicates
-          const newMatches = currentMatches.filter(newMatch => 
+          const newMatches = currentMatches.matches.filter(newMatch => 
             !allMatches.some(existingMatch => 
               existingMatch.homeTeam === newMatch.homeTeam && 
               existingMatch.awayTeam === newMatch.awayTeam && 
@@ -751,27 +699,56 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
           );
           
           allMatches = [...allMatches, ...newMatches];
-          console.log(`Total unique matches collected: ${allMatches.length}`);
 
-          if (currentMatches.length === lastMatchCount) {
-            console.log('No new matches loaded after last click, stopping');
-            break;
+          // Log detailed information about the current page
+          console.log(`\nPage ${clickCount + 1} Summary:`);
+          console.log(`Date Range: ${currentMatches.dateRange.earliestDate} to ${currentMatches.dateRange.latestDate}`);
+          console.log(`Matches on page: ${currentMatches.matches.length}`);
+          console.log(`New matches found: ${newMatches.length}`);
+          console.log(`Total matches collected: ${allMatches.length}`);
+          
+          // Show a sample of new matches if any were found
+          if (newMatches.length > 0) {
+            console.log('\nNew matches sample:');
+            newMatches.slice(0, 3).forEach(match => {
+              const matchType = match.isFixture ? 'Fixture' : 'Result';
+              console.log(`${matchType}: ${match.homeTeam} vs ${match.awayTeam} (${match.date})`);
+            });
           }
-          lastMatchCount = currentMatches.length;
+          
+          // Check if we got any new matches
+          if (currentMatches.matches.length === lastMatchCount) {
+            noNewMatchesCount++;
+            console.log(`\nNo new matches found (attempt ${noNewMatchesCount}/${MAX_NO_NEW_MATCHES})`);
+            
+            if (noNewMatchesCount >= MAX_NO_NEW_MATCHES) {
+              console.log('Reached maximum attempts with no new matches, stopping');
+              break;
+            }
+          } else {
+            noNewMatchesCount = 0;
+          }
+          
+          lastMatchCount = currentMatches.matches.length;
 
-          // Look for More results button
-          const buttonExists = await page.evaluate(() => {
+          // Look for More results button with enhanced logging
+          const buttonInfo = await page.evaluate(() => {
             const button = document.querySelector('.gar-matches-list__btn.btn-secondary.-next');
-            return button !== null && (button as HTMLElement).offsetParent !== null;
+            return {
+              exists: button !== null,
+              visible: button !== null && (button as HTMLElement).offsetParent !== null,
+              text: button?.textContent?.trim() || 'Not found'
+            };
           });
 
-          if (!buttonExists) {
-            console.log('No more "More results" button found - all matches loaded');
+          if (!buttonInfo.exists || !buttonInfo.visible) {
+            console.log('\nNo more "More results" button found - all matches loaded');
             break;
           }
 
+          console.log(`\nFound "More results" button: "${buttonInfo.text}"`);
           clickCount++;
-          console.log(`Clicking "More results" button (attempt ${clickCount})...`);
+          console.log(`Loading page ${clickCount + 1}...`);
 
           // Add random delay before clicking
           await page.waitForTimeout(randomDelay(1500, 3500));
@@ -791,17 +768,43 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
           await page.waitForTimeout(randomDelay(2000, 4000));
           
         } catch (error) {
-          console.log('Error clicking More results button:', error);
+          console.error('Error loading more results:', error);
           break;
         }
       }
 
-      console.log(`Total clicks: ${clickCount}`);
-      console.log(`Final match count: ${allMatches.length}`);
-      console.log('Scraping completed successfully');
+      // Final summary
+      console.log('\n=== Collection Complete ===');
+      console.log('-------------------------');
+      console.log(`Total pages loaded: ${clickCount + 1}`);
+      console.log(`Total matches collected: ${allMatches.length}`);
+      
+      // Analyze the date range of collected matches
+      const dates = allMatches.map(m => m.date).sort();
+      if (dates.length > 0) {
+        console.log(`Date range: ${dates[0]} to ${dates[dates.length - 1]}`);
+      }
+      
+      // Count fixtures vs results
+      const fixtures = allMatches.filter(m => m.isFixture);
+      const results = allMatches.filter(m => !m.isFixture);
+      console.log(`Fixtures: ${fixtures.length}`);
+      console.log(`Results: ${results.length}`);
+
+      // Show competition breakdown
+      const competitions = new Map<string, number>();
+      allMatches.forEach(match => {
+        const count = competitions.get(match.competition) || 0;
+        competitions.set(match.competition, count + 1);
+      });
+      
+      console.log('\nCompetition Breakdown:');
+      competitions.forEach((count, competition) => {
+        console.log(`${competition}: ${count} matches`);
+      });
 
       // Save matches to database
-      console.log('Saving matches to database...');
+      console.log('\nSaving matches to database...');
       try {
         await matchDatabase.saveMatches(allMatches);
         console.log('Successfully saved matches to database');
@@ -812,15 +815,7 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
       
       // Process each match
       const processedMatches = allMatches.map(match => {
-        const isFixture = !match.homeScore && !match.awayScore; // If there's no score, it's a fixture
-        console.log('Processing match:', {
-          homeTeam: match.homeTeam,
-          awayTeam: match.awayTeam,
-          date: match.date,
-          hasScore: !!match.homeScore || !!match.awayScore,
-          isFixture: isFixture
-        });
-        
+        const isFixture = !match.homeScore && !match.awayScore;
         return {
           competition: match.competition,
           homeTeam: match.homeTeam,
@@ -838,26 +833,55 @@ export async function scrapeGAAFixturesAndResults(): Promise<Match[]> {
         };
       });
 
-      console.log('Processed matches summary:');
-      console.log('Total matches:', processedMatches.length);
-      console.log('Fixtures:', processedMatches.filter(m => m.isFixture).length);
-      console.log('Results:', processedMatches.filter(m => !m.isFixture).length);
-      console.log('Sample fixture:', processedMatches.find(m => m.isFixture));
-      console.log('Sample result:', processedMatches.find(m => !m.isFixture));
+      // Log a single summary instead of individual matches
+      const fixtureCount = processedMatches.filter(m => m.isFixture).length;
+      const resultCount = processedMatches.filter(m => !m.isFixture).length;
+      console.log('\nScraping Summary:');
+      console.log('----------------');
+      console.log(`Total matches: ${processedMatches.length}`);
+      console.log(`Fixtures: ${fixtureCount}`);
+      console.log(`Results: ${resultCount}`);
       
+      // Show just one example of each type
+      const sampleFixture = processedMatches.find(m => m.isFixture);
+      const sampleResult = processedMatches.find(m => !m.isFixture);
+      
+      if (sampleFixture) {
+        console.log('\nSample Fixture:');
+        console.log(`${sampleFixture.homeTeam} vs ${sampleFixture.awayTeam}`);
+        console.log(`${sampleFixture.date} ${sampleFixture.time || ''} - ${sampleFixture.venue || 'TBD'}`);
+      }
+      
+      if (sampleResult) {
+        console.log('\nSample Result:');
+        console.log(`${sampleResult.homeTeam} ${sampleResult.homeScore} - ${sampleResult.awayScore} ${sampleResult.awayTeam}`);
+        console.log(`${sampleResult.date} - ${sampleResult.venue || 'TBD'}`);
+      }
+      
+      console.log('\n=== Scraping Complete ===');
       return processedMatches;
       
     } catch (error) {
-      console.error('Error scraping GAA fixtures and results:', error);
+      console.error('Error during scraping:', error);
       throw error;
     } finally {
       console.log('Closing browser...');
       await browser.close();
+      console.log('Browser closed');
     }
   } catch (error) {
-    console.error('Error scraping GAA fixtures and results:', error);
+    console.error('Fatal error in scraper:', error);
     throw error;
   }
 }
 
-scrapeGAAFixturesAndResults().catch(console.error); 
+// Only run if called directly
+if (require.main === module) {
+    console.log('\n=== Running Scraper Directly ===');
+    scrapeGAAFixturesAndResults().catch(error => {
+        console.error('Fatal error in scraper:', error);
+        process.exit(1);
+    });
+} else {
+    console.log('Scraper module loaded as dependency');
+} 

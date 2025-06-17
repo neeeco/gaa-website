@@ -3,7 +3,8 @@ import 'dotenv/config';
 
 import express, { Request, Response } from 'express';
 import cors from 'cors';
-import { scrapeGAAFixturesAndResults, shouldScrape, forceScrape } from './scraper';
+import { matchDatabase } from './database';
+import { scrapeGAAFixturesAndResults, shouldScrape, forceScrape } from './scripts/scraper/scraper';
 import { loadMatches, saveMatches } from './utils/storage';
 import fs from 'fs';
 import path from 'path';

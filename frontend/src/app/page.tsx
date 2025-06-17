@@ -1238,7 +1238,7 @@ export default function HomePage() {
       return updateGroupDataWithFinalMatches(allIrelandSFCGroups, matches);
     }
     return updateGroupDataWithMatches(allIrelandSFCGroups, matches);
-  }, [matches]);
+  }, [matches, groupsAreFinal]);
 
   return (
     <div className="min-h-screen bg-white">
@@ -1332,7 +1332,7 @@ export default function HomePage() {
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                 }`}
               >
-                Groups
+                Groups {groupsComplete && <span className="ml-1">(Complete)</span>}
               </button>
             )}
           </div>
@@ -1349,7 +1349,7 @@ export default function HomePage() {
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                 }`}
               >
-                Live Scores
+                Live Scores ({liveUpdates.length})
               </button>
               <button
                 onClick={() => setActiveSubTab('weekend')}
@@ -1359,7 +1359,7 @@ export default function HomePage() {
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                 }`}
               >
-                This Weekend's Fixtures
+                This Weekend&apos;s Fixtures
               </button>
             </div>
           )}

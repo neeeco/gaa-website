@@ -609,19 +609,26 @@ function getWeekDescription(weekKey: string, weekendMap: Record<string, { saturd
       return matchDate >= weekend.saturday && matchDate <= weekend.sunday;
     }) || [];
 
+    // Filter matches by active sport if specified
+    const relevantMatches = activeSport 
+      ? weekendMatches.filter(match => 
+          activeSport === 'hurling' ? isHurlingMatch(match) : isFootballMatch(match)
+        )
+      : weekendMatches;
+
     // Hurling Quarter-Finals for June 21st/22nd
     const isHurlingQuarterFinals =
       weekend.saturday.getMonth() === 5 && // June is month 5
       weekend.saturday.getDate() === 21 &&
       weekend.sunday.getDate() === 22 &&
-      weekendMatches.some(match => isHurlingMatch(match));
+      relevantMatches.some(match => isHurlingMatch(match));
 
     if (isHurlingQuarterFinals) {
       return `Quarter-Finals ${formatWeekendDates(weekend.saturday, weekend.sunday)}`;
     }
 
     // Check for Semi-Finals by looking for Quarter-Final Winners
-    const semiFinalMatches = weekendMatches.filter(match => {
+    const semiFinalMatches = relevantMatches.filter(match => {
       const homeTeamLower = match.homeTeam?.toLowerCase() || '';
       const awayTeamLower = match.awayTeam?.toLowerCase() || '';
       return (homeTeamLower === 'quarter-final winner' || homeTeamLower === 'quarter final winner') ||
@@ -633,7 +640,7 @@ function getWeekDescription(weekKey: string, weekendMap: Record<string, { saturd
     }
 
     // Check for Final
-    const finalMatch = weekendMatches.find(match => {
+    const finalMatch = relevantMatches.find(match => {
       const compLower = match.competition?.toLowerCase() || '';
       const homeTeamLower = match.homeTeam?.toLowerCase() || '';
       const awayTeamLower = match.awayTeam?.toLowerCase() || '';
@@ -653,7 +660,7 @@ function getWeekDescription(weekKey: string, weekendMap: Record<string, { saturd
       weekend.sunday.getDate() === 22;
 
     if (isPreliminaryQuarterFinalsWeekend) {
-      const hasFootballMatches = weekendMatches.some(match => {
+      const hasFootballMatches = relevantMatches.some(match => {
         const compLower = match.competition?.toLowerCase() || '';
         return compLower.includes('all-ireland') && 
                compLower.includes('senior') && 
@@ -672,7 +679,7 @@ function getWeekDescription(weekKey: string, weekendMap: Record<string, { saturd
       weekend.sunday.getDate() === 29;
 
     if (isQuarterFinalsWeekend) {
-      const hasMatches = weekendMatches.some(match => {
+      const hasMatches = relevantMatches.some(match => {
         const compLower = match.competition?.toLowerCase() || '';
         return compLower.includes('all-ireland') && compLower.includes('senior');
       });
@@ -689,7 +696,7 @@ function getWeekDescription(weekKey: string, weekendMap: Record<string, { saturd
       weekend.sunday.getDate() === 15;
 
     if (isFinalGroupRound) {
-      const hasFootballMatches = weekendMatches.some(match => {
+      const hasFootballMatches = relevantMatches.some(match => {
         const compLower = match.competition?.toLowerCase() || '';
         return compLower.includes('all-ireland') && 
                compLower.includes('senior') && 
@@ -719,7 +726,7 @@ function getWeekDescription(weekKey: string, weekendMap: Record<string, { saturd
       weekend.sunday.getDate() === 1;
 
     if (isRoundTwo) {
-      const hasFootballMatches = weekendMatches.some(match => {
+      const hasFootballMatches = relevantMatches.some(match => {
         const compLower = match.competition?.toLowerCase() || '';
         return compLower.includes('all-ireland') && 
                compLower.includes('senior') && 
@@ -738,7 +745,7 @@ function getWeekDescription(weekKey: string, weekendMap: Record<string, { saturd
        (weekend.saturday.getDate() === 24 && weekend.sunday.getDate() === 25));
 
     if (isRoundOne) {
-      const hasFootballMatches = weekendMatches.some(match => {
+      const hasFootballMatches = relevantMatches.some(match => {
         const compLower = match.competition?.toLowerCase() || '';
         return compLower.includes('all-ireland') && 
                compLower.includes('senior') && 
@@ -751,7 +758,7 @@ function getWeekDescription(weekKey: string, weekendMap: Record<string, { saturd
     }
     
     // Only show "Weekend of" if there are actual matches
-    if (weekendMatches.length > 0) {
+    if (relevantMatches.length > 0) {
       return `Weekend of ${formatWeekendDates(weekend.saturday, weekend.sunday)}`;
     }
     

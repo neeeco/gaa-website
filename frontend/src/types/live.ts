@@ -36,4 +36,25 @@ export interface LiveScoresResponse {
 export interface LiveUpdatesResponse {
   data: LiveMatchWithUpdates[];
   error?: string;
+}
+
+export interface FixtureWithScore {
+  id: number;
+  competition: string;
+  hometeam: string;
+  awayteam: string;
+  date: string;
+  time?: string;
+  venue?: string;
+  liveScore?: {
+    match_key: string;
+    home_team: string;
+    away_team: string;
+    home_score?: string;
+    away_score?: string;
+    minute?: number;
+    is_final: boolean;
+    updated_at: string;
+  } | null;
+  hasLiveScore: boolean;
 } 

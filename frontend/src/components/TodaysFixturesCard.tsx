@@ -1,26 +1,6 @@
 import React from 'react';
 import Image from 'next/image';
-
-interface FixtureWithScore {
-  id: number;
-  competition: string;
-  hometeam: string;
-  awayteam: string;
-  date: string;
-  time?: string;
-  venue?: string;
-  liveScore?: {
-    match_key: string;
-    home_team: string;
-    away_team: string;
-    home_score?: string;
-    away_score?: string;
-    minute?: number;
-    is_final: boolean;
-    updated_at: string;
-  } | null;
-  hasLiveScore: boolean;
-}
+import { FixtureWithScore } from '../types/live';
 
 interface TodaysFixturesCardProps {
   fixture: FixtureWithScore;
@@ -29,7 +9,6 @@ interface TodaysFixturesCardProps {
 export default function TodaysFixturesCard({ fixture }: TodaysFixturesCardProps) {
   const getTeamLogo = (teamName: string) => {
     // Simple SVG logo generation (you can enhance this)
-    const normalizedName = teamName.toLowerCase().trim();
     const initials = teamName.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 3);
     
     const svgLogo = `
@@ -122,14 +101,6 @@ export default function TodaysFixturesCard({ fixture }: TodaysFixturesCardProps)
         {fixture.liveScore.home_score} - {fixture.liveScore.away_score}
       </div>
     );
-  };
-
-  const formatTime = (timestamp: string) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString('en-GB', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
   };
 
   const isRecent = () => {

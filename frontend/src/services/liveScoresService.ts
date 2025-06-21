@@ -1,4 +1,4 @@
-import { LiveScore, LiveUpdate, LiveMatchWithUpdates, LiveScoresResponse, LiveUpdatesResponse } from '../types/live';
+import { LiveScoresResponse, LiveUpdatesResponse } from '../types/live';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -80,7 +80,7 @@ export class LiveScoresService {
     }
   }
 
-  async getTodaysFixturesWithScores(): Promise<any> {
+  async getTodaysFixturesWithScores(): Promise<{ data: unknown[]; error?: string }> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/todays-fixtures-with-scores`, {
         method: 'GET',

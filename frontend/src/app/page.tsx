@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import Image from 'next/image';
 import { Match, GroupTeam, Group, isValidMatch, isValidString } from '../types/matches';
 import { getMatches, getLiveUpdates } from '@/services/matches';
 import { liveScoresService } from '../services/liveScoresService';
 import { LiveScore, LiveMatchWithUpdates } from '../types/live';
 import TodaysFixturesCard from '../components/TodaysFixturesCard';
+import { FixtureWithScore } from '../types/live';
 
 // Helper function to determine if a match is hurling
 function isHurlingMatch(match: Match): boolean {
@@ -1239,9 +1240,8 @@ export default function HomePage() {
   }, [updatedGroups]);
 
   // Fetch live scores data
-  const fetchLiveScores = async () => {
+  const fetchLiveScores = useCallback(async () => {
     if (activeTab !== 'live') return;
-    
     try {
       setLiveScoresLoading(true);
       const [scoresResponse, updatesResponse, fixturesResponse] = await Promise.all([
@@ -1265,30 +1265,28 @@ export default function HomePage() {
       if (fixturesResponse.error) {
         console.error('Error fetching today\'s fixtures:', fixturesResponse.error);
       } else {
-        setTodaysFixtures(fixturesResponse.data);
+        setTodaysFixtures(fixturesResponse.data as FixtureWithScore[]);
       }
     } catch (error) {
       console.error('Error fetching live scores data:', error);
     } finally {
       setLiveScoresLoading(false);
     }
-  };
+  }, [activeTab]);
 
   // Fetch live scores when tab changes to live
   useEffect(() => {
     if (activeTab === 'live') {
       fetchLiveScores();
     }
-  }, [activeTab]);
+  }, [activeTab, fetchLiveScores]);
 
   // Auto-refresh live scores every 30 seconds when on live tab
   useEffect(() => {
     if (activeTab !== 'live') return;
-
     const interval = setInterval(() => {
       fetchLiveScores();
     }, 30000);
-
     return () => clearInterval(interval);
   }, [activeTab, fetchLiveScores]);
 

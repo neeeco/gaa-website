@@ -204,6 +204,45 @@ app.get('/api/live-updates', async (req, res) => {
     }
 });
 
+// Live scores endpoint
+app.get('/api/live-scores', async (req, res) => {
+    try {
+        await initDatabase();
+        const scores = await matchDatabase.getLiveScores();
+        console.log('Live scores found:', scores.length);
+        res.json(scores);
+    } catch (error) {
+        console.error('Error fetching live scores:', error);
+        res.status(500).json({ error: 'Failed to fetch live scores' });
+    }
+});
+
+// Live scores with updates endpoint
+app.get('/api/live-scores-with-updates', async (req, res) => {
+    try {
+        await initDatabase();
+        const matches = await matchDatabase.getLiveUpdates();
+        console.log('Live scores with updates found:', matches.length);
+        res.json(matches);
+    } catch (error) {
+        console.error('Error fetching live scores with updates:', error);
+        res.status(500).json({ error: 'Failed to fetch live scores with updates' });
+    }
+});
+
+// Today's fixtures with live scores endpoint
+app.get('/api/todays-fixtures-with-scores', async (req, res) => {
+    try {
+        await initDatabase();
+        const fixturesWithScores = await matchDatabase.getTodaysFixturesWithScores();
+        console.log(`Today's fixtures with scores: ${fixturesWithScores.length} fixtures`);
+        res.json(fixturesWithScores);
+    } catch (error) {
+        console.error('Error fetching today\'s fixtures with scores:', error);
+        res.status(500).json({ error: 'Failed to fetch today\'s fixtures with scores' });
+    }
+});
+
 // Start server
 app.listen(port, async () => {
     console.log('\n=== GAA Website Server ===');
@@ -214,7 +253,10 @@ app.listen(port, async () => {
     console.log('  GET  /api/stats - Database statistics');
     console.log('  GET  /api/competitions - Available competitions');
     console.log('  POST /api/refresh - Force data refresh');
-    console.log('  GET  /api/live-updates - Get live updates\n');
+    console.log('  GET  /api/live-updates - Get live updates');
+    console.log('  GET  /api/live-scores - Get live scores');
+    console.log('  GET  /api/live-scores-with-updates - Get live scores with updates');
+    console.log('  GET  /api/todays-fixtures-with-scores - Get today\'s fixtures with scores\n');
 
     // Run initial scrape
     try {

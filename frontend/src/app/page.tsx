@@ -4,6 +4,9 @@ import { useEffect, useState, useMemo } from 'react';
 import Image from 'next/image';
 import { Match, GroupTeam, Group, isValidMatch, isValidString } from '../types/matches';
 import { getMatches, getLiveUpdates } from '@/services/matches';
+import { liveScoresService } from '../services/liveScoresService';
+import { LiveScore, LiveMatchWithUpdates } from '../types/live';
+import TodaysFixturesCard from '../components/TodaysFixturesCard';
 
 // Helper function to determine if a match is hurling
 function isHurlingMatch(match: Match): boolean {
@@ -1037,6 +1040,10 @@ export default function HomePage() {
   const [mounted, setMounted] = useState(true);
   const [liveUpdates, setLiveUpdates] = useState<Match[]>([]);
   const [activeSubTab, setActiveSubTab] = useState<'live' | 'weekend'>('live');
+  const [liveScores, setLiveScores] = useState<LiveScore[]>([]);
+  const [liveScoresWithUpdates, setLiveScoresWithUpdates] = useState<LiveMatchWithUpdates[]>([]);
+  const [liveScoresLoading, setLiveScoresLoading] = useState(false);
+  const [todaysFixtures, setTodaysFixtures] = useState<any[]>([]);
 
   useEffect(() => {
     setMounted(true);
@@ -1231,12 +1238,59 @@ export default function HomePage() {
     return isGroupStageComplete(updatedGroups);
   }, [updatedGroups]);
 
-  // Fetch live updates when Live Scores tab is selected
+  // Fetch live scores data
+  const fetchLiveScores = async () => {
+    if (activeTab !== 'live') return;
+    
+    try {
+      setLiveScoresLoading(true);
+      const [scoresResponse, updatesResponse, fixturesResponse] = await Promise.all([
+        liveScoresService.getLiveScores(),
+        liveScoresService.getLiveScoresWithUpdates(),
+        liveScoresService.getTodaysFixturesWithScores()
+      ]);
+
+      if (scoresResponse.error) {
+        console.error('Error fetching live scores:', scoresResponse.error);
+      } else {
+        setLiveScores(scoresResponse.data);
+      }
+
+      if (updatesResponse.error) {
+        console.error('Error fetching live updates:', updatesResponse.error);
+      } else {
+        setLiveScoresWithUpdates(updatesResponse.data);
+      }
+
+      if (fixturesResponse.error) {
+        console.error('Error fetching today\'s fixtures:', fixturesResponse.error);
+      } else {
+        setTodaysFixtures(fixturesResponse.data);
+      }
+    } catch (error) {
+      console.error('Error fetching live scores data:', error);
+    } finally {
+      setLiveScoresLoading(false);
+    }
+  };
+
+  // Fetch live scores when tab changes to live
   useEffect(() => {
     if (activeTab === 'live') {
-      getLiveUpdates().then(setLiveUpdates);
+      fetchLiveScores();
     }
   }, [activeTab]);
+
+  // Auto-refresh live scores every 30 seconds when on live tab
+  useEffect(() => {
+    if (activeTab !== 'live') return;
+
+    const interval = setInterval(() => {
+      fetchLiveScores();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [activeTab, fetchLiveScores]);
 
   // In the main component, use updateGroupDataWithFinalMatches for the group tables if group stage is over
   const groupsAreFinal = true; // Set to true since group stage has ended
@@ -1356,7 +1410,7 @@ export default function HomePage() {
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                 }`}
               >
-                Live Scores ({liveUpdates.length})
+                Today's Fixtures ({todaysFixtures.length})
               </button>
               <button
                 onClick={() => setActiveSubTab('weekend')}
@@ -1517,35 +1571,55 @@ export default function HomePage() {
                 {/* Live Scores Sub-tab Content */}
                 {activeSubTab === 'live' && (
                   <div className="space-y-6">
-                    {(() => {
-                      const today = new Date();
-                      today.setHours(0, 0, 0, 0);
-                      
-                      const liveMatches = matches.filter(match => {
-                        const matchDate = parseMatchDate(match);
-                        matchDate.setHours(0, 0, 0, 0);
-                        return matchDate.getTime() === today.getTime();
-                      });
-
-                      if (liveMatches.length === 0) {
-                        return (
-                          <div className="text-center py-12 bg-gray-50 rounded-lg">
-                            <p className="text-gray-600">No live scores today</p>
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div className="space-y-4">
-                          {liveMatches.map((match, index) => (
-                            <MatchRow 
-                              key={`live-${match.homeTeam}-${match.awayTeam}-${match.date}-${match.time || ''}-${index}`} 
-                              match={match} 
-                            />
-                          ))}
+                    {liveScoresLoading ? (
+                      <div className="flex items-center justify-center py-12">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                        <span className="ml-3 text-gray-600">Loading today's fixtures...</span>
+                      </div>
+                    ) : todaysFixtures.length === 0 ? (
+                      <div className="text-center py-12 bg-gray-50 rounded-lg">
+                        <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <h3 className="mt-2 text-sm font-medium text-gray-900">No fixtures today</h3>
+                        <p className="mt-1 text-sm text-gray-500">
+                          There are no fixtures scheduled for today. Check the weekend fixtures tab for upcoming matches.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h2 className="text-lg font-semibold text-gray-900">Today's Fixtures</h2>
+                          <span className="text-sm text-gray-600">
+                            {todaysFixtures.length} fixture{todaysFixtures.length !== 1 ? 's' : ''}
+                          </span>
                         </div>
-                      );
-                    })()}
+                        
+                        {/* Group fixtures by competition */}
+                        {(() => {
+                          const fixturesByCompetition = todaysFixtures.reduce((acc, fixture) => {
+                            if (!acc[fixture.competition]) {
+                              acc[fixture.competition] = [];
+                            }
+                            acc[fixture.competition].push(fixture);
+                            return acc;
+                          }, {} as Record<string, any[]>);
+
+                          return Object.entries(fixturesByCompetition).map(([competition, fixtures]) => (
+                            <div key={competition} className="space-y-3">
+                              <h3 className="text-md font-medium text-gray-700 border-b pb-2">
+                                {competition}
+                              </h3>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {(fixtures as any[]).map((fixture) => (
+                                  <TodaysFixturesCard key={fixture.id} fixture={fixture} />
+                                ))}
+                              </div>
+                            </div>
+                          ));
+                        })()}
+                      </div>
+                    )}
                   </div>
                 )}
 

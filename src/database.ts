@@ -292,7 +292,6 @@ class MatchDatabase {
     const { data, error } = await this.supabase
       .from('live_scores')
       .select('*')
-      .gt('updated_at', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString())
       .order('updated_at', { ascending: false });
 
     if (error) throw error;
@@ -301,7 +300,7 @@ class MatchDatabase {
 
   async getLiveUpdates() {
     try {
-      // Get live scores
+      // Get live scores - get all scores, not just recent ones
       const { data: liveScores, error: liveScoresError } = await this.supabase
         .from('live_scores')
         .select('*')
@@ -309,7 +308,7 @@ class MatchDatabase {
 
       if (liveScoresError) throw liveScoresError;
 
-      // Get live updates
+      // Get live updates - get all updates, not just recent ones
       const { data: liveUpdates, error: liveUpdatesError } = await this.supabase
         .from('live_updates')
         .select('*')
@@ -333,6 +332,49 @@ class MatchDatabase {
       return matches;
     } catch (error) {
       console.error('Error getting live updates:', error);
+      throw error;
+    }
+  }
+
+  async getTodaysFixturesWithScores() {
+    try {
+      // Get today's date in YYYY-MM-DD format
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+      
+      // Get today's fixtures
+      const { data: fixtures, error: fixturesError } = await this.supabase
+        .from('matches')
+        .select('*')
+        .eq('isfixture', true)
+        .ilike('date', `%${todayStr}%`);
+
+      if (fixturesError) throw fixturesError;
+
+      // Get all live scores from the last 24 hours
+      const { data: liveScores, error: scoresError } = await this.supabase
+        .from('live_scores')
+        .select('*')
+        .gte('updated_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+
+      if (scoresError) throw scoresError;
+
+      // Combine fixtures with live scores
+      const fixturesWithScores = fixtures.map(fixture => {
+        // Create a match key that matches the RTE scraper format
+        const matchKey = `${fixture.hometeam} vs ${fixture.awayteam}`;
+        const liveScore = liveScores.find(score => score.match_key === matchKey);
+        
+        return {
+          ...fixture,
+          liveScore: liveScore || null,
+          hasLiveScore: !!liveScore
+        };
+      });
+
+      return fixturesWithScores;
+    } catch (error) {
+      console.error('Error getting today\'s fixtures with scores:', error);
       throw error;
     }
   }

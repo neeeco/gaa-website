@@ -33,31 +33,50 @@ def extract_live_update_info(text):
     is_final = any(keyword.lower() in text.lower() for keyword in full_time_keywords)
     is_halftime = any(keyword.lower() in text.lower() for keyword in halftime_keywords)
 
-    # Match scores like "67 mins: Kilkenny 2-20 Galway 1-18" or "70+2 mins: ..."
-    pattern = r"(\d+)(?:\+(\d+))?\s+mins:\s+(.+?)\s+(\d+-\d+)\s+(.+?)\s+(\d+-\d+)"
-    match = re.search(pattern, text)
+    # Multiple patterns to match different score formats
+    patterns = [
+        # Pattern 1: "67 mins: Kilkenny 2-20 Galway 1-18" or "70+2 mins: ..."
+        r"(\d+)(?:\+(\d+))?\s+mins:\s+(.+?)\s+(\d+-\d+)\s+(.+?)\s+(\d+-\d+)",
+        # Pattern 2: "Kerry 1-03 Cavan 0-02" (simple score format)
+        r"(.+?)\s+(\d+-\d+)\s+(.+?)\s+(\d+-\d+)",
+        # Pattern 3: "Team1 1-2 Team2 0-1" (without mins)
+        r"(.+?)\s+(\d+-\d+)\s+(.+?)\s+(\d+-\d+)",
+    ]
 
-    if match:
-        base_minute = int(match.group(1))
-        extra_minute = int(match.group(2)) if match.group(2) else 0
-        minute = base_minute + extra_minute
-        home_team_name = match.group(3).strip()
-        home_score = match.group(4)
-        away_team_name = match.group(5).strip()
-        away_score = match.group(6)
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            if pattern == patterns[0]:  # First pattern with minutes
+                base_minute = int(match.group(1))
+                extra_minute = int(match.group(2)) if match.group(2) else 0
+                minute = base_minute + extra_minute
+                home_team_name = match.group(3).strip()
+                home_score = match.group(4)
+                away_team_name = match.group(5).strip()
+                away_score = match.group(6)
+            else:  # Other patterns without minutes
+                minute = None
+                home_team_name = match.group(1).strip()
+                home_score = match.group(2)
+                away_team_name = match.group(3).strip()
+                away_score = match.group(4)
 
-        home = get_team_info(home_team_name)
-        away = get_team_info(away_team_name)
+            # Clean up team names (remove extra whitespace and common prefixes)
+            home_team_name = re.sub(r'^\s*', '', home_team_name)
+            away_team_name = re.sub(r'^\s*', '', away_team_name)
 
-        return {
-            "minute": minute,
-            "home_team": home["name"],
-            "home_score": home_score,
-            "away_team": away["name"],
-            "away_score": away_score,
-            "is_final": is_final,
-            "timestamp": datetime.now().isoformat()
-        }
+            home = get_team_info(home_team_name)
+            away = get_team_info(away_team_name)
+
+            return {
+                "minute": minute,
+                "home_team": home["name"],
+                "home_score": home_score,
+                "away_team": away["name"],
+                "away_score": away_score,
+                "is_final": is_final,
+                "timestamp": datetime.now().isoformat()
+            }
 
     return None
 
@@ -214,7 +233,8 @@ def save_live_scores_to_supabase(updates_by_match):
             
         latest = sorted(updates, key=lambda u: (u.get('minute') or 0, u.get('timestamp')))[-1]
         try:
-            supabase.table('live_scores').upsert({
+            # Use upsert with proper conflict resolution
+            result = supabase.table('live_scores').upsert({
                 'match_key': match_key,
                 'home_team': latest['home_team'],
                 'away_team': latest['away_team'],
@@ -223,10 +243,31 @@ def save_live_scores_to_supabase(updates_by_match):
                 'minute': latest.get('minute'),
                 'is_final': latest.get('is_final', False),
                 'updated_at': latest.get('timestamp', datetime.now().isoformat())
+            }, {
+                'onConflict': 'match_key'
             }).execute()
-            print(f"✅ Updated latest score for {match_key}")
+            print(f"✅ Updated latest score for {match_key}: {latest.get('home_score')} vs {latest.get('away_score')}")
         except Exception as e:
             print(f"❌ Error upserting latest score for {match_key}: {e}")
+            # Try alternative approach - delete and insert
+            try:
+                print(f"🔄 Trying delete and insert for {match_key}")
+                # Delete existing record
+                supabase.table('live_scores').delete().eq('match_key', match_key).execute()
+                # Insert new record
+                supabase.table('live_scores').insert({
+                    'match_key': match_key,
+                    'home_team': latest['home_team'],
+                    'away_team': latest['away_team'],
+                    'home_score': latest.get('home_score'),
+                    'away_score': latest.get('away_score'),
+                    'minute': latest.get('minute'),
+                    'is_final': latest.get('is_final', False),
+                    'updated_at': latest.get('timestamp', datetime.now().isoformat())
+                }).execute()
+                print(f"✅ Successfully updated score for {match_key} using delete/insert")
+            except Exception as e2:
+                print(f"❌ Failed to update score for {match_key} even with delete/insert: {e2}")
 
 if __name__ == "__main__":
     scrape_rte_live_articles()

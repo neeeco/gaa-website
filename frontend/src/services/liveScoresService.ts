@@ -36,28 +36,6 @@ export class LiveScoresService {
     }
   }
 
-  async getLiveUpdates(): Promise<LiveUpdatesResponse> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/live-updates`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        cache: 'no-store', // Always fetch fresh data
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return { data };
-    } catch (error) {
-      console.error('Error fetching live updates:', error);
-      return { data: [], error: error instanceof Error ? error.message : 'Unknown error' };
-    }
-  }
-
   async getLiveScoresWithUpdates(): Promise<LiveUpdatesResponse> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/live-scores-with-updates`, {

@@ -3,9 +3,8 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import Image from 'next/image';
 import { Match, GroupTeam, Group, isValidMatch, isValidString } from '../types/matches';
-import { getMatches, getLiveUpdates } from '@/services/matches';
+import { getMatches } from '@/services/matches';
 import { liveScoresService } from '../services/liveScoresService';
-import { LiveScore, LiveMatchWithUpdates } from '../types/live';
 import TodaysFixturesCard from '../components/TodaysFixturesCard';
 import { FixtureWithScore } from '../types/live';
 
@@ -1039,12 +1038,9 @@ export default function HomePage() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [weekendDatesMap, setWeekendDatesMap] = useState<Record<string, { saturday: Date; sunday: Date }>>({});
   const [mounted, setMounted] = useState(true);
-  const [liveUpdates, setLiveUpdates] = useState<Match[]>([]);
   const [activeSubTab, setActiveSubTab] = useState<'live' | 'weekend'>('live');
-  const [liveScores, setLiveScores] = useState<LiveScore[]>([]);
-  const [liveScoresWithUpdates, setLiveScoresWithUpdates] = useState<LiveMatchWithUpdates[]>([]);
   const [liveScoresLoading, setLiveScoresLoading] = useState(false);
-  const [todaysFixtures, setTodaysFixtures] = useState<any[]>([]);
+  const [todaysFixtures, setTodaysFixtures] = useState<FixtureWithScore[]>([]);
 
   useEffect(() => {
     setMounted(true);
@@ -1244,23 +1240,7 @@ export default function HomePage() {
     if (activeTab !== 'live') return;
     try {
       setLiveScoresLoading(true);
-      const [scoresResponse, updatesResponse, fixturesResponse] = await Promise.all([
-        liveScoresService.getLiveScores(),
-        liveScoresService.getLiveScoresWithUpdates(),
-        liveScoresService.getTodaysFixturesWithScores()
-      ]);
-
-      if (scoresResponse.error) {
-        console.error('Error fetching live scores:', scoresResponse.error);
-      } else {
-        setLiveScores(scoresResponse.data);
-      }
-
-      if (updatesResponse.error) {
-        console.error('Error fetching live updates:', updatesResponse.error);
-      } else {
-        setLiveScoresWithUpdates(updatesResponse.data);
-      }
+      const fixturesResponse = await liveScoresService.getTodaysFixturesWithScores();
 
       if (fixturesResponse.error) {
         console.error('Error fetching today\'s fixtures:', fixturesResponse.error);
@@ -1408,7 +1388,7 @@ export default function HomePage() {
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                 }`}
               >
-                Today's Fixtures ({todaysFixtures.length})
+                Today&apos;s Fixtures ({todaysFixtures.length})
               </button>
               <button
                 onClick={() => setActiveSubTab('weekend')}
@@ -1572,7 +1552,7 @@ export default function HomePage() {
                     {liveScoresLoading ? (
                       <div className="flex items-center justify-center py-12">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                        <span className="ml-3 text-gray-600">Loading today's fixtures...</span>
+                        <span className="ml-3 text-gray-600">Loading today&apos;s fixtures...</span>
                       </div>
                     ) : todaysFixtures.length === 0 ? (
                       <div className="text-center py-12 bg-gray-50 rounded-lg">
@@ -1587,7 +1567,7 @@ export default function HomePage() {
                     ) : (
                       <div className="space-y-4">
                         <div className="flex items-center justify-between">
-                          <h2 className="text-lg font-semibold text-gray-900">Today's Fixtures</h2>
+                          <h2 className="text-lg font-semibold text-gray-900">Today&apos;s Fixtures</h2>
                           <span className="text-sm text-gray-600">
                             {todaysFixtures.length} fixture{todaysFixtures.length !== 1 ? 's' : ''}
                           </span>
@@ -1601,7 +1581,7 @@ export default function HomePage() {
                             }
                             acc[fixture.competition].push(fixture);
                             return acc;
-                          }, {} as Record<string, any[]>);
+                          }, {} as Record<string, FixtureWithScore[]>);
 
                           return Object.entries(fixturesByCompetition).map(([competition, fixtures]) => (
                             <div key={competition} className="space-y-3">
@@ -1609,7 +1589,7 @@ export default function HomePage() {
                                 {competition}
                               </h3>
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {(fixtures as any[]).map((fixture) => (
+                                {fixtures.map((fixture) => (
                                   <TodaysFixturesCard key={fixture.id} fixture={fixture} />
                                 ))}
                               </div>
